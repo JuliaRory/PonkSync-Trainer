@@ -22,6 +22,8 @@ class OnlineGraph(QFrame):
         self.figure = pg.PlotWidget(self)     # list с виджетами для графиков миограмм
         self.line = self.figure.plot(y=self.data_processor.emg, x=self.data_processor.ts)    # отображение "ничего" на месте сигнала миограммы
 
+        self.trigger_lines = []
+
         self.figure.setMinimumSize(max_width, max_height)
         self.figure.setBackground("k")  # set black color for a background
 
@@ -34,5 +36,22 @@ class OnlineGraph(QFrame):
     def _setup_layout(self):
         self.figure.move(0, 0)
 
-    def update_plot(self, emg):
-        self.line.setData(emg, self.data_processor.ts)
+    def update_plot(self):
+        self.line.setData(x=self.data_processor.ts, y=self.data_processor.emg)
+        self.check_trigger_lines()
+    
+    def check_trigger_lines(self):
+        # view_range = self.figure.viewRange()
+        # xmin, xmax = view_range[0]
+        xmin = self.data_processor.ts[0]
+        for line in self.trigger_lines[:]:
+            if line.value() < xmin:
+                self.figure.removeItem(line)
+                self.trigger_lines.remove(line)
+
+    def plot_trigger(self, idx):
+        x_coord = self.data_processor.ts[-idx]
+        line = pg.InfiniteLine(pos=x_coord, angle=90, pen="r")
+        self.trigger_lines.append(line)
+        self.figure.addItem(line)
+        # self.figure.plot(y=self.data_processor.emg, x=self.data_processor.ts)    # отображение "ничего" на месте сигнала миограммы

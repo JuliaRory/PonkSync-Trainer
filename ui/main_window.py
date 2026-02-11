@@ -62,9 +62,9 @@ class MainWindow(QWidget):
 
     def _setup_connections(self):
         # работа с потоками данных
-        self._input_stream.dataReady.connect(lambda epoch, ts: self._data_processor.add_epoch(epoch, ts))
-        self._data_processor.newDataProcessed.connect(lambda: self._plot_updater.plot_pack(self._data_processor))
-
+        self._input_stream.dataReady.connect(lambda epoch, ts: self._data_processor.add_pack(epoch, ts))
+        self._data_processor.newDataProcessed.connect(lambda: self._plot_updater.plot_pack())
+        self._data_processor.triggerIdx.connect(lambda idx: self._plot_updater.plot_trigger(idx))
    
 
 
