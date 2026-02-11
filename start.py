@@ -28,7 +28,7 @@ if __name__ == "__main__":
     # output_stream_stimuli = driver.outputMessageStream("stimuli")         # создание выходного потока данных типа Message
     resonance = ResonanceAppProxy(output_stream)                          # Создаем прокси резонанса
 
-    # driver.loadConfig(r'stream_nvx136@eeg__to__PonkSync-Trainer@emg.json')       # вгрузить настройки с потоком в резонансе
+    driver.loadConfig(r'stream_nvx136@eeg__to__PonkSync-Trainer@emg.json')       # вгрузить настройки с потоком в резонансе
 
     # == Запуск приложения ==
 

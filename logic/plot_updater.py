@@ -9,8 +9,9 @@ class PlotUpdater:
         self.plot_panel = panel
         self.settings = settings            # settings plot_settings
     
-    def plot_pack(self, pack, processor):
+    def plot_pack(self, processor):
         s = self.settings.processing_settings
+        emg = processor.emg
         if s.do_notch:
             emg = processor.apply_notch()
         if s.do_butter:

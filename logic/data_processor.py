@@ -36,12 +36,19 @@ class DataProcessor(QObject):
         self.ts =  deque(range(0, self.settings.plot_settings.time_range_ms, int(1000/self.settings.Fs)), maxlen=maxlen)                             # стек с данными таймстемпов
         self.emg = deque(zeros, maxlen=maxlen)     # стек с данными EMG
 
+        self.timestamp = 0
+
         # функции-трансформации
         self._baseline = lambda x: x
         self._lowpass_filter = lambda x: x
         self._transform = lambda x: x
 
         self._ms_to_sample = lambda x: int(x / 1000 * self.settings.Fs)                                  # функция для пересчёта мс в сэмплы
+
+        self._init_state()
+    
+    def _init_state(self):
+        self.create_filters()
 
 
     @pyqtSlot(object, float)
@@ -53,7 +60,7 @@ class DataProcessor(QObject):
         Signals:
             newDataProcessed: новая pack добавлена.
         """
-        emg = np.diff(pack[:, self.settings.emg_channels], axis=1).squeexe() * 1E3
+        emg = np.diff(pack[:, self.settings.emg_channels], axis=1).squeeze() * 1E3
         self.emg.extend(emg)
 
         time = int(emg.shape[0] * 1000 / self.settings.Fs)
@@ -66,8 +73,10 @@ class DataProcessor(QObject):
     def create_notch(self):
         n_ch = len(self.settings.emg_channels) // 2
 
-        Q = self.settings.notch_fr / self.settings.notch_width
-        b_notch, a_notch = iirnotch(self.settings.notch_fr, Q, fs=self.settings.Fs)
+        s = self.settings.processing_settings
+
+        Q = s.notch_fr / s.notch_width
+        b_notch, a_notch = iirnotch(s.notch_fr, Q, fs=self.settings.Fs)
 
         self.sos_notch = tf2sos(b_notch, a_notch)
         zi_base = sosfilt_zi(self.sos_notch)
@@ -89,7 +98,6 @@ class DataProcessor(QObject):
             freqs = s.freq_low
 
         if butter_type is not None:
-            freqs
             self.sos_butter = butter(N=s.butter_order, Wn=freqs, btype=butter_type, output='sos', fs=self.settings.Fs)
             zi_base = sosfilt_zi(self.sos_butter)
             self.zi_butter = np.tile(zi_base[:, :, np.newaxis], (1, 1, n_ch))
@@ -103,11 +111,11 @@ class DataProcessor(QObject):
         return np.vstack([tkeo[0], tkeo, tkeo[-1]])   # добавление крайних соседей для сохранения длины
     
     def apply_notch(self):
-        emg, self.zi_notch = sosfilt(self.sos_notch, self.emg, axis=0, zi=self.zi_notch)
+        emg, self.zi_notch = sosfilt(self.sos_notch, np.array(self.emg), axis=0, zi=self.zi_notch)
         return emg
     
     def apply_butter(self):
-        emg, self.zi_butter = sosfilt(self.sos_butter, self.emg, axis=0, zi=self.zi_butter)
+        emg, self.zi_butter = sosfilt(self.sos_butter, np.array(self.emg), axis=0, zi=self.zi_butter)
         return emg
 
     # --- Сброс сессий ---
