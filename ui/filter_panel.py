@@ -1,6 +1,6 @@
 from PyQt5.QtCore import Qt, QTimer, QObject, QThread, pyqtSignal
 from PyQt5.QtGui import QIcon
-from PyQt5.QtWidgets import QMainWindow, QWidget, QGridLayout, QPushButton, QLabel, QSpinBox, QDoubleSpinBox, QCheckBox, QVBoxLayout
+from PyQt5.QtWidgets import QMainWindow, QWidget, QGridLayout, QPushButton, QLabel, QSpinBox, QDoubleSpinBox, QCheckBox, QVBoxLayout, QFrame
 
 
 from utils.ui_helpers import (
@@ -27,8 +27,6 @@ class SettingsPanel(QFrame):
     def _setup_ui(self):
         self.combobox_signal_type = create_combo_box(["EMG", "TKEO"], curr_item_idx=0, parent=self)  # show tkeo or filtered emg
 
-        
-    
     def create_filter_settings(self):
 
         # 5-150 Hz Butterworth bandpass filter 
