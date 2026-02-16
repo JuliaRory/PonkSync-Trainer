@@ -1,5 +1,5 @@
 import pyqtgraph as pg
-from PyQt5.QtWidgets import QFrame
+from PyQt5.QtWidgets import QFrame, QHBoxLayout
 
 class OnlineGraph(QFrame):
          
@@ -10,6 +10,7 @@ class OnlineGraph(QFrame):
         self.settings = settings.plot_settings
 
         self._setup_ui()
+        self._setup_layout()
      
     def _setup_ui(self):
         # EMG/TKEO(EMG) vs time plot
@@ -21,6 +22,8 @@ class OnlineGraph(QFrame):
 
         self.figure = pg.PlotWidget(self)     # list с виджетами для графиков миограмм
         self.line = self.figure.plot(y=self.data_processor.emg, x=self.data_processor.ts)    # отображение "ничего" на месте сигнала миограммы
+
+        self._trigger_line = self.figure.plot(y=self.data_processor.emg, x=self.data_processor.ts, pen="b")    # отображение "ничего" на месте сигнала миограммы
 
         self.trigger_lines = []
 
@@ -34,10 +37,14 @@ class OnlineGraph(QFrame):
         self.figure.setYRange(self.settings.ymin * scale_factor, self.settings.ymax * scale_factor)
 
     def _setup_layout(self):
-        self.figure.move(0, 0)
+        layout = QHBoxLayout(self)
+        layout.addWidget(self.figure)
 
     def update_plot(self):
         self.line.setData(x=self.data_processor.ts, y=self.data_processor.emg)
+
+        self._trigger_line.setData(x=self.data_processor.ts, y=self.data_processor.trigger)
+
         self.check_trigger_lines()
     
     def check_trigger_lines(self):

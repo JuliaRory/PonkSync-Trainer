@@ -10,9 +10,10 @@ from utils.layout_utils import create_hbox, create_vbox
 from utils.logic_helpers import are_equal
 
 
-class SettingsPanel(QFrame):
+
+class FilterPanel(QFrame):
     
-    """ Панель с настройками."""
+    """ Панель с настройками процессинга графика."""
 
     def __init__(self, settings, parent=None):
         super().__init__(parent)
@@ -23,59 +24,24 @@ class SettingsPanel(QFrame):
         self.settings = settings
         self._setup_ui()
         self._setup_layout()
-    
+
+
     def _setup_ui(self):
-        self.combobox_signal_type = create_combo_box(["EMG", "TKEO"], curr_item_idx=0, parent=self)  # show tkeo or filtered emg
+        s = self.settings.processing_settings
+        self.check_box_notch = create_check_box(s.do_notch, text="notch 50 Hz", parent=self)
+        self.check_box_lowpass = create_check_box(s.do_lowpass, text="lowpass", parent=self)
+        self.check_box_highpass = create_check_box(s.do_highpass, text="highpass", parent=self)
+        self.spin_box_lower_freq = create_spin_box(0, 100, s.freq_low, parent=self)
+        self.spin_box_upper_freq = create_spin_box(0, 5000, s.freq_high, parent=self)
 
-    def create_filter_settings(self):
-
-        # 5-150 Hz Butterworth bandpass filter 
-        label_butterworth = QLabel('Butterworth filter', self)
-        label_order = QLabel('order', self)
-        spin_box_order = self.spin_box(0, 20, self.butter_order)
-        spin_box_order.valueChanged[int].connect(self.set_butter_order)
-        self.check_box_butter = self.check_box(True, 'use filter?')
-        label_lower_fr = QLabel('Lower cut-off frequency', self)
-        box_lower_fr = self.spin_box_with_unit(unit='Hz', min=0, max=500, value=self.butter_lower_fr, function=self.set_butter_lower_fr)
-        self.check_box_lower_fr = self.check_box(True, 'use?')
-        label_upper_fr = QLabel('Upper cut-off frequency', self)
-        box_upper_fr = self.spin_box_with_unit(unit='Hz', min=0, max=500, value=self.butter_upper_fr, function=self.set_butter_upper_fr)
-        self.check_box_upper_fr = self.check_box(True, 'use?')
-
-        # 50 Hz Notch filter
-        label_notch = QLabel('Notch filter', self)
-        label_notch_fr = QLabel('frequency', self)
-        box_notch_fr = self.spin_box_with_unit(unit='Hz', min=0, max=500, value=self.notch_fr, function=self.set_notch_fr)
-        self.check_box_notch = self.check_box(True, 'use?')
-        label_notch_width = QLabel('width', self)
-        box_notch_width = self.spin_box_with_unit(unit='Hz', min=0, max=500, value=self.notch_width, function=self.set_notch_width)
-
-        row = 0
-        layout.addWidget(self.check_box_show_emg, row, 0, 1, 3)
-        row += 1
-        layout.addWidget(self.check_box_show_tkeo_emg, row, 0, 1, 3)
-        row += 1
-        layout.addWidget(label_butterworth, row, 0, 1, 3, Qt.AlignCenter)
-        row += 1
-        layout.addWidget(label_order, row, 0)
-        layout.addWidget(spin_box_order, row, 1)
-        layout.addWidget(self.check_box_butter, row, 2)
-        row += 1
-        layout.addWidget(label_lower_fr, row, 0)
-        layout.addWidget(box_lower_fr, row, 1)
-        layout.addWidget(self.check_box_lower_fr, row, 2)
-        row += 1
-        layout.addWidget(label_upper_fr, row, 0)
-        layout.addWidget(box_upper_fr, row, 1)
-        layout.addWidget(self.check_box_upper_fr, row, 2)
-        row += 1
-        layout.addWidget(label_notch, row, 0, 1, 3, Qt.AlignCenter)
-        row += 1
-        layout.addWidget(label_notch_fr, row, 0)
-        layout.addWidget(box_notch_fr, row, 1)
-        layout.addWidget(self.check_box_notch, row, 2)
-        row += 1
-        layout.addWidget(label_notch_width, row, 0)
-        layout.addWidget(box_notch_width, row, 1)
+    def _setup_layout(self):
         
-        self.box_filter_settings.setLayout(layout)
+        layout = QVBoxLayout(self)
+        layout.addLayout(create_hbox([self.check_box_notch]))
+        layout.addLayout(create_hbox([self.check_box_lowpass, self.spin_box_upper_freq, QLabel("Hz")]))
+        layout.addLayout(create_hbox([self.check_box_highpass, self.spin_box_lower_freq, QLabel("Hz")]))
+
+        layout.setContentsMargins(0, 0, 0, 0)  # убираем все внешние отступы
+        layout.setSpacing(0)  # убираем промежутки между виджетами
+        layout.addStretch()
+    

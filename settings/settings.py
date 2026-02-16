@@ -6,7 +6,7 @@ class PlotSettings:
     ymax: int = 2
     ymin: int = -2
     scale_offset: int = 0
-    scale_factor: int = -3
+    scale_factor: int = -4
     time_range_ms: int = 6000  # ms
     
 
@@ -15,8 +15,9 @@ class ProcessingSettings:
     notch_fr: int = 50
     notch_width: int = 1
     butter_order: int = 4
-    freq_low: int = 5
-    freq_high: int = 150
+    freq_low: int = 30
+    freq_high: int = 500
+
     do_lowpass: bool = True
     do_highpass: bool = True
     do_butter: bool = True
@@ -29,7 +30,7 @@ class Settings:
     data_source: str = "nvx136"  # "SPEED"
     emg_channels: List[int] = field(default_factory=lambda: [64, 65])
 
-    Fs: int = 1000  # Hz
+    Fs: int = 5000  # Hz
     bit_index: int = 0
 
     plot_settings: PlotSettings = field(default_factory=PlotSettings)

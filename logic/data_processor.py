@@ -20,7 +20,7 @@ class DataProcessor(QObject):
         data (list): [max_n_samples x n_channels]
         timestamps (list): время прихода пакета (от резонанса) --> для сохранения эпох only [n_epoch]
 
-    Signals:
+    Signals:    
         newDataProcessed: обработка данных завершена.
         
     """
@@ -32,10 +32,12 @@ class DataProcessor(QObject):
         self.settings = settings    # settings
 
         # для хранения данных
-        maxlen = int(self.settings.plot_settings.time_range_ms * self.settings.Fs / 1000)
+        time_range_ms = self.settings.plot_settings.time_range_ms
+        maxlen = int(time_range_ms * self.settings.Fs / 1000)
         zeros = [0 for _ in range(maxlen)]
-        self.ts =  deque(range(0, self.settings.plot_settings.time_range_ms, int(1000/self.settings.Fs)), maxlen=maxlen)                             # стек с данными таймстемпов
+        self.ts =  deque(np.arange(maxlen) * 1000 / self.settings.Fs, maxlen=maxlen)                             # стек с данными таймстемпов
         self.emg = deque(zeros, maxlen=maxlen)     # стек с данными EMG
+        self.trigger = deque(zeros, maxlen=maxlen)     # стек с данными EMG
 
         self.timestamp = 0
 
@@ -44,6 +46,7 @@ class DataProcessor(QObject):
         self._lowpass_filter = lambda x: x
         self._transform = lambda x: x
 
+        self._coef = 1000 / self.settings.Fs
         self._ms_to_sample = lambda x: int(x / 1000 * self.settings.Fs)                                  # функция для пересчёта мс в сэмплы
 
         self._init_state()
@@ -66,23 +69,24 @@ class DataProcessor(QObject):
         s = self.settings.processing_settings
         if s.do_notch:
             emg = self.apply_notch(emg)
-        if s.do_butter:
+        if s.do_lowpass or s.do_highpass:
             emg = self.apply_butter(emg)
 
         self.emg.extend(emg)
 
-        time = int(emg.shape[0] * 1000 / self.settings.Fs)
-        self.ts.extend(np.arange(self.timestamp, self.timestamp + time, 1000//self.settings.Fs))
-
-        self.timestamp += time
-        self.newDataProcessed.emit()        # --> plot_updater
+        self.ts.extend(np.arange(self.timestamp, self.timestamp + emg.shape[0], 1) * self._coef)
+        self.timestamp += emg.shape[0]
 
         ttl = np.array(pack[:, -1], dtype=np.uint8)
         trigger = ((ttl>>self.settings.bit_index) & 0b1).astype(int)
+        self.trigger.extend(trigger*100)
+
         trigger_diff = np.diff(trigger)
         event = np.where(trigger_diff == 1)[0] 
         if len(event) != 0:
             self.triggerIdx.emit(event[0])
+
+        self.newDataProcessed.emit()        # --> plot_updater
 
 
     def create_notch(self):

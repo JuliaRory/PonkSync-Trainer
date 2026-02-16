@@ -1,7 +1,7 @@
 import pyqtgraph as pg
 from PyQt5.QtCore import Qt, QTimer, QObject, QThread, pyqtSignal
 from PyQt5.QtGui import QIcon
-from PyQt5.QtWidgets import QMainWindow, QWidget, QGridLayout, QPushButton, QLabel, QSpinBox, QDoubleSpinBox, QCheckBox, QVBoxLayout
+from PyQt5.QtWidgets import QMainWindow, QWidget, QGridLayout, QPushButton, QLabel, QSpinBox, QDoubleSpinBox, QCheckBox, QVBoxLayout, QHBoxLayout
 
 import time, random
 from h5py import File
@@ -17,19 +17,21 @@ from logic.data_processor import DataProcessor
 from logic.plot_updater import PlotUpdater
 
 from ui.online_graph import OnlineGraph
+from ui.scale_panel import ScalePanel
+from ui.filter_panel import FilterPanel
 
-WIDTH_SET, HEIGHT_SET = 1000, 800
+WIDTH_SET, HEIGHT_SET = 1200, 800
 
 class MainWindow(QWidget):
-    def __init__(self, input_stream, resonance):
+    def __init__(self, input_data_stream, input_message_stream):
         super().__init__()
         self.setWindowTitle("SyncPonk Trainer")
         # self.setWindowIcon(QIcon(r"./resources/icon.png"))
 
-        self._resonance = resonance                       # прокси для управления резонансными модулями
+        # self._resonance = resonance                       # прокси для управления резонансными модулями
         self.settings = Settings()                        # Хранилище настроек
 
-        self._input_stream = StreamSource(input_stream)                              # Приёмник (онлайн) данных
+        self._input_stream = StreamSource(input_data_stream, input_message_stream)                              # Приёмник (онлайн) данных
         self._data_processor = DataProcessor(self.settings)              
         
         self._setup_widgets()
@@ -50,6 +52,8 @@ class MainWindow(QWidget):
         # self.create_scale_settings()    # создать блок с настройками масштабирования    --> self.box_scale_settings
         # self.create_filter_settings()   # создать блок с настройками фильтрации         --> self.box_filter_settings
 
+        self._scale_panel = ScalePanel(self.settings, parent=self)
+        self._filter_panel = FilterPanel(self.settings, parent=self)
         self._figure_panel = OnlineGraph(self.settings, self._data_processor, parent=self)       # создать блок с графиками миограммы            --> self.plot_emg_graph
 
     
@@ -58,7 +62,12 @@ class MainWindow(QWidget):
     ## =======================
 
     def _setup_layout(self):
-        self._figure_panel.move(0, 0)
+        layout = QGridLayout(self)
+        
+        layout.addWidget(self._scale_panel, 0, 0, 1, 1, alignment=Qt.AlignRight)
+        layout.addWidget(self._filter_panel, 1, 0, 1, 1, alignment=Qt.AlignRight)
+        layout.addWidget(self._figure_panel, 0, 1, 4, 3)
+        
 
     def _setup_connections(self):
         # работа с потоками данных
@@ -67,9 +76,6 @@ class MainWindow(QWidget):
         self._data_processor.triggerIdx.connect(lambda idx: self._plot_updater.plot_trigger(idx))
    
 
-
-    
-            
     def _finilaze(self):
         self.show()
 
