@@ -26,6 +26,7 @@ class DataProcessor(QObject):
     """
     newDataProcessed = pyqtSignal()
     triggerIdx = pyqtSignal(int)
+    peakIdx = pyqtSignal(int)
  
     def __init__(self, settings):
         super().__init__()
@@ -34,17 +35,14 @@ class DataProcessor(QObject):
         # для хранения данных
         time_range_ms = self.settings.plot_settings.time_range_ms
         maxlen = int(time_range_ms * self.settings.Fs / 1000)
-        zeros = [0 for _ in range(maxlen)]
+        zeros = [np.nan for _ in range(maxlen)]
         self.ts =  deque(np.arange(maxlen) * 1000 / self.settings.Fs, maxlen=maxlen)                             # стек с данными таймстемпов
         self.emg = deque(zeros, maxlen=maxlen)     # стек с данными EMG
         self.trigger = deque(zeros, maxlen=maxlen)     # стек с данными EMG
 
         self.timestamp = 0
 
-        # функции-трансформации
-        self._baseline = lambda x: x
-        self._lowpass_filter = lambda x: x
-        self._transform = lambda x: x
+        self._trigger = None
 
         self._coef = 1000 / self.settings.Fs
         self._ms_to_sample = lambda x: int(x / 1000 * self.settings.Fs)                                  # функция для пересчёта мс в сэмплы
@@ -72,21 +70,68 @@ class DataProcessor(QObject):
         if s.do_lowpass or s.do_highpass:
             emg = self.apply_butter(emg)
 
+        if s.tkeo:
+            emg = self.calculate_TKEO(emg)
+
         self.emg.extend(emg)
 
-        self.ts.extend(np.arange(self.timestamp, self.timestamp + emg.shape[0], 1) * self._coef)
-        self.timestamp += emg.shape[0]
+        self.ts.extend(np.arange(self.timestamp, self.timestamp + emg.shape[0], 1) * self._coef)        # ms
+        self.timestamp += emg.shape[0]  # idx
 
         ttl = np.array(pack[:, -1], dtype=np.uint8)
         trigger = ((ttl>>self.settings.bit_index) & 0b1).astype(int)
-        self.trigger.extend(trigger*100)
+        self.trigger.extend(trigger*1E-3)
 
         trigger_diff = np.diff(trigger)
-        event = np.where(trigger_diff == 1)[0] 
+        event = np.where(trigger_diff == 1)[0]      # 0 -> 1
         if len(event) != 0:
-            self.triggerIdx.emit(event[0])
+            idx =-(len(trigger) - event[0])
+            self.triggerIdx.emit(idx)
+
+            self._trigger = self.ts[idx]       # для обработки поньков  [ms]
 
         self.newDataProcessed.emit()        # --> plot_updater
+
+        if self._trigger is not None:
+            self.process_ponk()
+
+    def process_ponk(self):
+        s = self.settings.detection_settings
+        window = s.window_ms
+        
+        if self.ts[-1] >= self._trigger+window[1]: # если накопилось достаточно сэмплов
+
+            print(self.ts[-1], self._trigger+window[1])
+            mask = np.where((self.ts >= self._trigger+window[0]) & (self.ts <= self._trigger+window[1]))[0]
+            x = np.array(self.emg)[mask]
+  
+            if s.thr_adaptive:
+                baseline = x[:self._ms_to_sample(s.baseline_ms)]
+                threshold = np.mean(baseline) + s.n_sd * np.std(baseline)
+            else:
+                threshold = s.threshold * (10 ** self.settings.plot_settings.scale_factor)
+ 
+            crossings = np.where(x > threshold)[0]
+
+            if len(crossings) > 0:
+                onset_idx = crossings[0]
+                onset_time = self.ts[onset_idx+mask[0]]
+                
+                self.peakIdx.emit(onset_idx+mask[0])
+
+                delay = onset_time - self._trigger 
+                print("DELAY {}".format(delay))
+            else:
+                print("NO PEAK HAS BEEN DETECTED")
+            # min_idx = int(np.argmin(x))
+            # max_idx = int(np.argmax(x))
+
+            # amp = (x[max_idx] - x[min_idx])
+            # ponk_idx = mask[0] + max_idx
+            # delay = self.ts[ponk_idx] - self._trigger
+            # print(amp, delay)
+
+            self._trigger = None 
 
 
     def create_notch(self):
@@ -127,8 +172,12 @@ class DataProcessor(QObject):
         self.create_butter()        # butterworth filter
 
     def calculate_TKEO(self, x):
-        tkeo = x[1:-1]**2 - x[:-2] * x[2:]
-        return np.vstack([tkeo[0], tkeo, tkeo[-1]])   # добавление крайних соседей для сохранения длины
+        tkeo = np.zeros_like(x)
+        tkeo[1:-1] = x[1:-1]**2 - x[:-2] * x[2:]
+
+        tkeo[0] = tkeo[1]    
+        tkeo[-1] = tkeo[-2] 
+        return tkeo
     
     def apply_notch(self, emg):
         emg, self.zi_notch = sosfilt(self.sos_notch, emg, axis=0, zi=self.zi_notch)

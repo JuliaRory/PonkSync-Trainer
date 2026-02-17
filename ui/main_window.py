@@ -12,6 +12,8 @@ from collections import deque
 import copy
 
 from settings.settings import Settings 
+from settings.settings_handler import SettingsHandler
+
 from logic.sources.stream import StreamSource
 from logic.data_processor import DataProcessor
 from logic.plot_updater import PlotUpdater
@@ -19,6 +21,9 @@ from logic.plot_updater import PlotUpdater
 from ui.online_graph import OnlineGraph
 from ui.scale_panel import ScalePanel
 from ui.filter_panel import FilterPanel
+from ui.peak_panel import PeakDetectionPanel
+
+
 
 WIDTH_SET, HEIGHT_SET = 1200, 800
 
@@ -38,6 +43,7 @@ class MainWindow(QWidget):
         self._setup_layout()
 
         self._plot_updater = PlotUpdater(self._figure_panel, self.settings)
+        self._settings_handler = SettingsHandler(self.settings, self._data_processor, self._plot_updater, ui=self)
 
         self._setup_connections()
 
@@ -54,6 +60,7 @@ class MainWindow(QWidget):
 
         self._scale_panel = ScalePanel(self.settings, parent=self)
         self._filter_panel = FilterPanel(self.settings, parent=self)
+        self._peak_panel = PeakDetectionPanel(self.settings, parent=self)
         self._figure_panel = OnlineGraph(self.settings, self._data_processor, parent=self)       # создать блок с графиками миограммы            --> self.plot_emg_graph
 
     
@@ -63,10 +70,20 @@ class MainWindow(QWidget):
 
     def _setup_layout(self):
         layout = QGridLayout(self)
+
+        #  
+        #
+        #
+        #
+
+        
         
         layout.addWidget(self._scale_panel, 0, 0, 1, 1, alignment=Qt.AlignRight)
         layout.addWidget(self._filter_panel, 1, 0, 1, 1, alignment=Qt.AlignRight)
+        
         layout.addWidget(self._figure_panel, 0, 1, 4, 3)
+        
+        layout.addWidget(self._peak_panel, 0, 4, 1, 1, alignment=Qt.AlignLeft)
         
 
     def _setup_connections(self):
@@ -74,6 +91,7 @@ class MainWindow(QWidget):
         self._input_stream.dataReady.connect(lambda epoch, ts: self._data_processor.add_pack(epoch, ts))
         self._data_processor.newDataProcessed.connect(lambda: self._plot_updater.plot_pack())
         self._data_processor.triggerIdx.connect(lambda idx: self._plot_updater.plot_trigger(idx))
+        self._data_processor.peakIdx.connect(lambda idx: self._plot_updater.plot_peak(idx))
    
 
     def _finilaze(self):
