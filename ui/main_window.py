@@ -70,13 +70,6 @@ class MainWindow(QWidget):
 
     def _setup_layout(self):
         layout = QGridLayout(self)
-
-        #  
-        #
-        #
-        #
-
-        
         
         layout.addWidget(self._scale_panel, 0, 0, 1, 1, alignment=Qt.AlignRight)
         layout.addWidget(self._filter_panel, 1, 0, 1, 1, alignment=Qt.AlignRight)
@@ -85,6 +78,9 @@ class MainWindow(QWidget):
         
         layout.addWidget(self._peak_panel, 0, 4, 1, 1, alignment=Qt.AlignLeft)
         
+    ## =======================
+    ## === CONNECTIONS =======
+    ## =======================
 
     def _setup_connections(self):
         # работа с потоками данных
@@ -98,20 +94,6 @@ class MainWindow(QWidget):
         self.show()
 
 
-    def set_max_value(self, value):
-        self.max_value = value
-        scale_factor = 10 ** self.scale_factor
-        for plot in self.plots:
-            plot.setYRange(self.min_value * scale_factor, value * scale_factor)
-
-
-    def set_min_value(self, value):
-        self.min_value = value
-        scale_factor = 10 ** self.scale_factor
-        for plot in self.plots:
-            plot.setYRange(value * scale_factor, self.max_value * scale_factor)
-
-
     def set_time_range_emg(self, value):
         self.time_range_emg = value * 1000 
         maxlen = int(value * 1000 / self.params["Fs"])
@@ -122,14 +104,7 @@ class MainWindow(QWidget):
     def set_time_range_clf(self, value):
         self.time_range_clf = value * 1000 
     
-    
-    def set_scale_factor(self, value):
-        self.scale_factor = value
-        scale_factor = 10 ** value
-        for plot in self.plots:
-            plot.setYRange(self.min_value*scale_factor, self.max_value*scale_factor)
-    
-
+  
     def set_scale_offset(self, value):
         scale_factor = 10 ** self.scale_factor
         self.scale_offset = scale_factor * value

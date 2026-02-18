@@ -4,7 +4,7 @@ from typing import List
 @dataclass
 class PlotSettings:
     ymax: int = 2
-    ymin: int = -2
+    ymin: int = 0
     scale_offset: int = 0
     scale_factor: int = -10
     time_range_ms: int = 4000  # ms    

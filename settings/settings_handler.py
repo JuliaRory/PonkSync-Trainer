@@ -32,6 +32,7 @@ class SettingsHandler:
         self._filter_panel = self.ui._filter_panel
         self._scale_panel = self.ui._scale_panel
         self._peak_panel = self.ui._peak_panel
+        self._graph = self.ui._figure_panel
 
         self._setup_units()
         self._update_thr()
@@ -39,9 +40,21 @@ class SettingsHandler:
 
     def _setup_connections(self):
         self._scale_panel.spin_box_scale.valueChanged[int].connect(self._update_scale)
+        self._scale_panel.spin_box_max_value.valueChanged[int].connect(self._update_ymax)
+        self._scale_panel.spin_box_min_value.valueChanged[int].connect(self._update_ymin)
+        self._scale_panel.spin_box_scale_offset.valueChanged[int].connect(self._update_offset)
+        self._scale_panel.spin_box_time_range.valueChanged[int].connect(self._update_timerange)
+
+        self._filter_panel.spin_box_lower_freq.valueChanged[int].connect(self._update_low_freq)
+        self._filter_panel.spin_box_upper_freq.valueChanged[int].connect(self._update_high_freq)
+        self._filter_panel.check_box_notch.stateChanged.connect(self._update_notch)
+        self._filter_panel.check_box_lowpass.stateChanged.connect(self._update_lowpass)
+        self._filter_panel.check_box_highpass.stateChanged.connect(self._update_highpass)
 
         self._peak_panel.spin_box_threshold_curr.valueChanged[int].connect(self._update_threshold)
         self._peak_panel.spin_box_threshold_mv.valueChanged[float].connect(self._update_threshold_mv)
+
+    # === plot settings === 
 
     def _update_threshold(self, thr):
         self.settings.detection_settings.threshold = thr
@@ -66,11 +79,49 @@ class SettingsHandler:
     def _update_scale(self, scale):
         self.settings.plot_settings.scale_factor = scale
 
+        self._graph.update_yrange()
         self._setup_units()
         self._update_thr()
+    
+    def _update_ymax(self, value):
+        self.settings.plot_settings.ymax = value
+        self._graph.update_yrange()
+    
+    def _update_ymin(self, value):
+        self.settings.plot_settings.ymin = value
+        self._graph.update_yrange()
+    
+    def _update_offset(self, value):
+        self.settings.plot_settings.scale_offset = value
+        print("DOES NOT WORK YET")
+    
+    def _update_timerange(self, value):
+        self.settings.plot_settings.time_range_ms = value * 1000
+        print("DOES NOT WORK YET")
 
     def _setup_units(self):
         factor = self.settings.plot_settings.scale_factor
         text = f"<span style='font-size: 14pt;'>&times; 10<sup>{factor}</sup></span>"
         self._peak_panel.label_units.setText(text)
+    
 
+    # === filter settings === 
+    def _update_low_freq(self, value):
+        self.settings.processing_settings.freq_low = value
+        self.data_processor.create_butter()
+    
+    def _update_high_freq(self, value):
+        self.settings.processing_settings.freq_high = value
+        self.data_processor.create_butter()
+    
+    def _update_notch(self, status):
+        self.settings.processing_settings.do_notch = status
+        self.data_processor.create_notch()
+    
+    def _update_lowpass(self, status):
+        self.settings.processing_settings.do_lowpass = status
+        self.data_processor.create_butter()
+    
+    def _update_highpass(self, status):
+        self.settings.processing_settings.do_highpass = status
+        self.data_processor.create_butter()

@@ -11,6 +11,7 @@ class OnlineGraph(QFrame):
 
         self._setup_ui()
         self._setup_layout()
+        self._finilize()
      
     def _setup_ui(self):
         # EMG/TKEO(EMG) vs time plot
@@ -42,6 +43,9 @@ class OnlineGraph(QFrame):
     def _setup_layout(self):
         layout = QHBoxLayout(self)
         layout.addWidget(self.figure)
+    
+    def _finilize(self):
+        self.update_yrange()
 
     def update_plot(self):
         self.line.setData(x=self.data_processor.ts, y=self.data_processor.emg)
@@ -80,6 +84,12 @@ class OnlineGraph(QFrame):
     def update_thr_line(self, thr):
         if self.thr_line is not None:
             self.figure.removeItem(self.thr_line)
-        print("PLOT THRESHOLD", thr)
         self.thr_line = pg.InfiniteLine(pos=thr, angle=0, pen="brown")
         self.figure.addItem(self.thr_line)
+    
+    def update_yrange(self):
+        scale_factor = 10 ** (self.settings.scale_factor)
+        ymin = self.settings.ymin * scale_factor
+        ymax = self.settings.ymax * scale_factor
+        self.figure.setYRange(ymin, ymax)
+    
