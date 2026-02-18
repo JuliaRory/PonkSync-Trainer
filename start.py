@@ -21,18 +21,20 @@ if __name__ == "__main__":
     # == Магическое подключениен драйвера для получения потока с данными из резонанса ==                                                                                        
     driver = Driver("PonkSync-Trainer")
 
-    dispatcher = CallDispatcher()                                         # пустая функция-обработчик
-    driver.inputDataStream("emg", dispatcher)                             # создание входного потока данных типа Stream
+    dispatcher_data = CallDispatcher()                                         # пустая функция-обработчик
+    driver.inputDataStream("data", dispatcher_data)                             # создание входного потока данных типа Stream
+    dispatcher_message = CallDispatcher()                                         # пустая функция-обработчик
+    driver.inputMessageStream("message", dispatcher_message)                             # создание входного потока данных типа Stream
 
-    output_stream = driver.outputMessageStream("controlSignal")           # создание выходного потока данных типа Message
+    # output_stream = driver.outputMessageStream("controlSignal")           # создание выходного потока данных типа Message
     # output_stream_stimuli = driver.outputMessageStream("stimuli")         # создание выходного потока данных типа Message
-    resonance = ResonanceAppProxy(output_stream)                          # Создаем прокси резонанса
+    # resonance = ResonanceAppProxy(output_stream)                          # Создаем прокси резонанса
 
-    driver.loadConfig(r'stream_nvx136-eeg__to__PonkSync-Trainer-emg.json')       # вгрузить настройки с потоком в резонансе
+    driver.loadConfig(r'streamDataSimulator__to__PonkSync.json')       # вгрузить настройки с потоком в резонансе
 
     # == Запуск приложения ==
 
-    window  = MainWindow(dispatcher, resonance)   # open main window
+    window  = MainWindow(dispatcher_data, dispatcher_message)   # open main window
     window.show()
     
     sys.exit(app.exec_())

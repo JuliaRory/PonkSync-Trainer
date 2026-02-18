@@ -1,69 +1,53 @@
-def create_scale_settings(self):
-        self.box_scale_settings = QWidget()
-        # self.box_scale_settings.setStyleSheet("QWidget""{""background : white;""}")
-        layout = QGridLayout()
+from PyQt5.QtCore import Qt, QTimer, QObject, QThread, pyqtSignal
+from PyQt5.QtGui import QIcon
+from PyQt5.QtWidgets import QMainWindow, QWidget, QGridLayout, QPushButton, QLabel, QSpinBox, QDoubleSpinBox, QCheckBox, QVBoxLayout, QFrame
 
-        # scale factor
-        label_scale_factor = QLabel('scale factor', self)
 
-        box_scale_factor = QWidget()
-        layout_scale_factor = QGridLayout()
-        label_1e = QLabel('1E', self)
-        spin_box_scale_factor = self.spin_box(-20, 20, self.scale_factor)
-        spin_box_scale_factor.valueChanged[int].connect(self.set_scale_factor)
-        layout_scale_factor.addWidget(label_1e, 0, 0, 1, 1)
-        layout_scale_factor.addWidget(spin_box_scale_factor, 0, 1, 1, 2)
-        box_scale_factor.setLayout(layout_scale_factor)
+from utils.ui_helpers import (
+    create_button, create_spin_box, create_check_box, create_combo_box, create_lineedit
+)
+from utils.layout_utils import create_hbox, create_vbox
+from utils.logic_helpers import are_equal
 
-        # maximum value
-        label_max_value = QLabel('maximum value', self)
-        spin_box_max_value = self.spin_box(-100, 100, self.max_value)
-        spin_box_max_value.valueChanged[int].connect(self.set_max_value)
 
-        # minimum value
-        label_min_value = QLabel('minimum value', self)
-        spin_box_min_value = self.spin_box(-100, 100, self.min_value)
-        spin_box_min_value.valueChanged[int].connect(self.set_min_value)
-
-        # scale step
-        # label_scale_step = QtWidgets.QLabel('scale step', self)
-        # spin_box_scale_step = self.spin_box(0, 100, 2)
-        # spin_box_scale_step.valueChanged[int].connect(self.set_scale_step)
-
-        # scale offset
-        label_scale_offset = QLabel('scale offset', self)
-        spin_box_scale_offset = self.spin_box(-100, 100, self.scale_offset)
-        spin_box_scale_offset.valueChanged[int].connect(self.set_scale_offset)
-
-        # time range
-        label_time_range_EMG = QLabel('time range EMG', self)
-        box_time_range_EMG = self.spin_box_with_unit(unit='c', min=0, max=20, value=int(self.time_range_emg // 1000), function=self.set_time_range_emg)
-        
-        label_time_range_CLF = QLabel('time range CLF', self)
-        box_time_range_CLF = self.spin_box_with_unit(unit='c', min=0, max=20, value=int(self.time_range_clf // 1000), function=self.set_time_range_clf)
-
-        row = 0
-        layout.addWidget(label_scale_factor, row, 0)
-        layout.addWidget(box_scale_factor, row, 1)
-        layout.addWidget(label_scale_offset, row, 2)
-        layout.addWidget(spin_box_scale_offset, row, 3)
-        row += 1
-        layout.addWidget(label_max_value, row, 0)
-        layout.addWidget(spin_box_max_value, row, 1)
-        layout.addWidget(label_min_value, row, 2)
-        layout.addWidget(spin_box_min_value, row, 3)
-        row += 1
-        layout.addWidget(label_time_range_CLF, row, 0)
-        layout.addWidget(box_time_range_CLF, row, 1)
-        layout.addWidget(label_time_range_EMG, row, 2)
-        layout.addWidget(box_time_range_EMG, row, 3)
-        # row += 1
-        # layout.addWidget(label_scale_step, row, 0)
-        # layout.addWidget(spin_box_scale_step, row, 1)
-        row += 1
-        
-
-        self.box_scale_settings.setLayout(layout)
+class ScalePanel(QFrame):
     
+    """ Панель с настройками отображения графика."""
 
+    def __init__(self, settings, parent=None):
+        super().__init__(parent)
+
+        # self.setObjectName("settings_panel")    # для привязки стиля
+        # self.setMinimumWidth(150)
+
+        self.settings = settings
+        self._setup_ui()
+        self._setup_layout()
+
+   
+    def _setup_ui(self):
+
+        s = self.settings.plot_settings
+        self.spin_box_scale = create_spin_box(-20, 20, s.scale_factor, parent=self)
+        self.spin_box_max_value = create_spin_box(-100, 100, s.ymax, parent=self)
+        self.spin_box_min_value = create_spin_box(-100, 100, s.ymin, parent=self)
+        self.spin_box_scale_offset = create_spin_box(-100, 100, s.scale_offset, parent=self)
+        self.spin_box_time_range = create_spin_box(1, 20, int(s.time_range_ms//1000), parent=self)
+
+        self.combobox_signal_type = create_combo_box(["EMG", "TKEO"], curr_item_idx=0, parent=self)  # show tkeo or filtered emg
     
+    def _setup_layout(self):
+        
+        layout = QVBoxLayout(self)
+        layout.addLayout(create_hbox([QLabel("Scale factor:"), self.spin_box_scale]))
+        layout.addLayout(create_hbox([QLabel("y offset:"), self.spin_box_scale_offset]))
+        layout.addLayout(create_hbox([QLabel("ymin:"), self.spin_box_min_value, QLabel("ymax:"), self.spin_box_max_value]))
+        layout.addLayout(create_hbox([QLabel("Time range:"), self.spin_box_time_range, QLabel("s")]))
+
+        layout.addLayout(create_hbox([QLabel("Signal:"), self.combobox_signal_type]))
+
+        layout.setContentsMargins(0, 0, 0, 0)  # убираем все внешние отступы
+        layout.setSpacing(0)  # убираем промежутки между виджетами
+        layout.addStretch()
+
+

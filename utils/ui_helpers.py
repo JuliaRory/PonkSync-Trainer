@@ -1,7 +1,6 @@
 from PyQt5.QtWidgets import QPushButton, QSpinBox, QDoubleSpinBox, QCheckBox, QComboBox, QShortcut, QLineEdit, QLabel
 from PyQt5.QtCore import Qt, QObject, QEvent, QPoint
 from PyQt5.QtGui import QKeySequence, QFont, QFontMetrics
-from ui.widgets.checkable_combo_box import CheckableComboBox
 from PyQt5.QtWidgets import QToolTip, QStyledItemDelegate
 
 def create_lineedit(callback=None, disabled=False, parent=None, w=None):

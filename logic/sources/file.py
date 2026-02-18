@@ -3,6 +3,7 @@ import numpy as np
 import h5py
 
 class FileSource(DataSource):
+    
     def load_file(self, path):
         with h5py.File(path, "r") as f:
             epochs = f["epochs"][:]

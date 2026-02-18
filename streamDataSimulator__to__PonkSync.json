@@ -1,0 +1,48 @@
+[
+	{
+		"attributes": {
+			"activeStream": {
+				"connections": [],
+				"metaData": {}
+			},
+			"reconnect": true
+		},
+		"enabled": true,
+		"group": "default",
+		"index": 0,
+		"label": "message",
+		"name": "message",
+		"serialized": {
+			"desiredStream": {
+				"connections": [
+					"discover:///?stream=simulatedStream&name=signalSimulator"
+				],
+				"metaData": {},
+				"name": "simulatedStream",
+				"serializedType": "DgA="
+			}
+		},
+		"type": "Resonance::Parameters::Stream"
+	},
+	{
+		"attributes": {
+			"activeStream": {
+				"connections": [],
+				"metaData": {}
+			},
+			"reconnect": true
+		},
+		"enabled": true,
+		"group": "default",
+		"index": 0,
+		"label": "data",
+		"name": "data",
+		"serialized": {
+			"desiredStream": {
+				"connections": [],
+				"metaData": {}
+			}
+		},
+		"type": "Resonance::Parameters::Stream"
+	}
+]

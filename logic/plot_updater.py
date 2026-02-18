@@ -14,4 +14,10 @@ class PlotUpdater:
     
     def plot_trigger(self, idx):
         self.plot_panel.plot_trigger(idx)
+    
+    def plot_peak(self, idx):
+        self.plot_panel.plot_peak(idx)
+    
+    def change_thr_line(self, thr):
+        self.plot_panel.update_thr_line(thr)
 
