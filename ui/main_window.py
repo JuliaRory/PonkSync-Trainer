@@ -22,7 +22,7 @@ from ui.online_graph import OnlineGraph
 from ui.scale_panel import ScalePanel
 from ui.filter_panel import FilterPanel
 from ui.peak_panel import PeakDetectionPanel
-
+from ui.stimuli_control_panel import StimuliControlPanel
 
 
 WIDTH_SET, HEIGHT_SET = 1200, 800
@@ -62,7 +62,7 @@ class MainWindow(QWidget):
         self._filter_panel = FilterPanel(self.settings, parent=self)
         self._peak_panel = PeakDetectionPanel(self.settings, parent=self)
         self._figure_panel = OnlineGraph(self.settings, self._data_processor, parent=self)       # создать блок с графиками миограммы            --> self.plot_emg_graph
-
+        self._stimuli_panel = StimuliControlPanel(self.settings, parent=self)
     
     ## =======================
     ## === LAYOUT ===========
@@ -77,6 +77,7 @@ class MainWindow(QWidget):
         layout.addWidget(self._figure_panel, 0, 1, 4, 3)
         
         layout.addWidget(self._peak_panel, 0, 4, 1, 1, alignment=Qt.AlignLeft)
+        layout.addWidget(self._stimuli_panel, 1, 4, 1, 1, alignment=Qt.AlignLeft)
         
     ## =======================
     ## === CONNECTIONS =======

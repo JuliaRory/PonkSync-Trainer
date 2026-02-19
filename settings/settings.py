@@ -2,6 +2,15 @@ from dataclasses import dataclass, field
 from typing import List
 
 @dataclass
+class StimuliSettings:
+    volume: int = 80
+    monitor: int = 3
+    record: bool = False
+    cross_figure: str = "cross_image_white_photomark.png"
+    triplet_video: str = "OffsetTriplet_0__soa750_audio-30_freq440_dur50_trigWB.mkv"
+    cross_ms: int = 3000
+
+@dataclass
 class PlotSettings:
     ymax: int = 2
     ymin: int = 0
@@ -47,3 +56,4 @@ class Settings:
     detection_settings: DetectionSettings = field(default_factory=DetectionSettings)
     plot_settings: PlotSettings = field(default_factory=PlotSettings)
     processing_settings: ProcessingSettings = field(default_factory=ProcessingSettings)
+    stimuli_settings: StimuliSettings = field(default_factory=StimuliSettings)
