@@ -57,23 +57,28 @@ class SettingsHandler:
     # === plot settings === 
 
     def _update_threshold(self, thr):
+        print("tkeo", thr)
         self.settings.detection_settings.threshold = thr
-        mv = sqrt(thr) / 1E3
-        self._peak_panel.spin_box_threshold_mv.setValue(mv)
-        self.settings.detection_settings.threshold_mv = mv
+        # -> mv
+        # mv = sqrt(thr) / 1E3
+        # self._peak_panel.spin_box_threshold_mv.setValue(mv)
+        # self.settings.detection_settings.threshold_mv = mv
         self._update_thr()
 
     def _update_threshold_mv(self, thr):
+        print("mv", thr)
         self.settings.detection_settings.threshold_mv = thr
-        tkeo_thr = (thr ** 2) * ((1/1000) ** 2) 
-        scale = 10 ** (self.settings.plot_settings.scale_factor)
-        coef = tkeo_thr / scale
-        self._peak_panel.spin_box_threshold_curr.setValue(int(coef))
-        self.settings.detection_settings.threshold = int(coef)
+        # -> tkeo units
+        # tkeo_thr = (thr ** 2) * ((1/1000) ** 2) 
+        # scale = 10 ** (self.settings.plot_settings.scale_factor)
+        # coef = tkeo_thr / scale
+        # self._peak_panel.spin_box_threshold_curr.setValue(int(coef))
+        # self.settings.detection_settings.threshold = int(coef)
         self._update_thr()
     
     def _update_thr(self):
-        thr = self.settings.detection_settings.threshold * 10 ** (self.settings.plot_settings.scale_factor)
+        thr = self.settings.detection_settings.threshold * (10 ** (self.settings.plot_settings.scale_factor))
+        print(thr)
         self.plot_updater.change_thr_line(thr)
 
     def _update_scale(self, scale):

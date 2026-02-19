@@ -1,7 +1,7 @@
 import sys, os
 
 import vlc
-import random
+import time
 
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer
@@ -37,6 +37,7 @@ class StimuliPresentation_one_by_one(QWidget):
     playerIsMuted = pyqtSignal()
     currIdxChanged = pyqtSignal(int)
     _videoEnded = pyqtSignal()
+    tripletStarted = pyqtSignal(bool)       # --> data_processor
 
     stimulus = pyqtSignal(str)
     
@@ -45,6 +46,7 @@ class StimuliPresentation_one_by_one(QWidget):
 
         self._volume = settings.volume
         self.settings = settings 
+        self.show_delay = False
 
         # Настройка экрана
         screens = QApplication.instance().screens()
@@ -62,6 +64,8 @@ class StimuliPresentation_one_by_one(QWidget):
         self._finished = False               # остановлен т.к. закончилась последовательность
         self._sequence_started = False      # последовательность началась
         self._is_paused = False             # и не на паузе
+
+        self._counter = 0
         
         self._cross_figure_path = os.path.join(r"resources\stimuli", self.settings.cross_figure)
         self._triplet_video_path = os.path.join(r"resources\stimuli", self.settings.triplet_video)
@@ -91,8 +95,11 @@ class StimuliPresentation_one_by_one(QWidget):
         # === Placeholder widget поверх всего ===
         self._configure_placeholder_widget()
 
+        self._configure_feedback_widget()
+
         # === Подготовка последовательности ===
         self.media = self._instance.media_new(self._triplet_video_path)
+        self.media.add_option(':start-time=1.56')
         self.media.parse_async()  # preload
         
     def _configure_video_widget(self):
@@ -128,6 +135,26 @@ class StimuliPresentation_one_by_one(QWidget):
 
         print('[VLC player]: press Space to start.')
 
+    def _configure_feedback_widget(self):
+        self._feedback_widget = QLabel(self)
+        self._feedback_widget.setStyleSheet("""
+            font-size: 40px;
+            font-weight: bold;
+            color: blue;
+        """)
+
+        x = int(self.width() // 2 - 250)
+        y = int(0.2 * self.height())
+        width = 500
+        height = 100
+
+        self._feedback_widget.setGeometry(x, y, width, height)
+        self._feedback_widget.setAlignment(Qt.AlignCenter)
+
+        self._feedback_ms = self.settings.feedback_ms      # проигрвать крест 
+        self._show_feedback_ms = self.settings.show_feedback 
+        
+
     # ===============================
     # === цикл проигрывания видео ===
     # ===============================
@@ -142,6 +169,8 @@ class StimuliPresentation_one_by_one(QWidget):
         # запустить следующее видео
         self._player.set_media(self.media)
         self._player.audio_set_volume(self._volume)
+
+        self.tripletStarted.emit(True)
         self._player.play()
 
         # подготовить следующее видео
@@ -163,10 +192,28 @@ class StimuliPresentation_one_by_one(QWidget):
         if self._player.get_state() == vlc.State.Ended:
             # Сразу показываем placeholder перед следующим видео
             self._placeholder_widget.show()
-            QTimer.singleShot(self._cross_dur_ms, self._play_next_video)
+            self.tripletStarted.emit(False)
+            if self.show_delay:
+                QTimer.singleShot(self._show_feedback_ms, self._check_feedback)
+            else:
+                QTimer.singleShot(self._cross_dur_ms, self._play_next_video)
         else:
             QTimer.singleShot(50, self._check_video_end)
     
+    def _check_feedback(self):
+        self._feedback_widget.setText(f"Delay: {self.delay_value} ms.")
+        self._feedback_widget.show()
+        self.show_delay = False
+        QTimer.singleShot(self._feedback_ms, self._show_cross)
+
+    
+    def _show_cross(self):
+        self._feedback_widget.hide()
+        self._feedback_widget.repaint()
+        self._placeholder_widget.show()
+        QTimer.singleShot(self._cross_dur_ms, self._play_next_video)
+        
+
     # =======================
     # ===     события     ===
     # =======================
@@ -200,6 +247,10 @@ class StimuliPresentation_one_by_one(QWidget):
     # ====================
     # ===    логика    ===
     # ====================
+
+    def show_feedback(self, delay):
+        self.show_delay = True
+        self.delay_value = delay
 
     # === показ стимулов ===
     def _on_space_pressed(self):

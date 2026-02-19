@@ -89,7 +89,26 @@ class MainWindow(QWidget):
         self._data_processor.newDataProcessed.connect(lambda: self._plot_updater.plot_pack())
         self._data_processor.triggerIdx.connect(lambda idx: self._plot_updater.plot_trigger(idx))
         self._data_processor.peakIdx.connect(lambda idx: self._plot_updater.plot_peak(idx))
-   
+
+        self._data_processor.delayValue[int].connect(lambda delay: self._process_delay(delay))
+        self._stimuli_panel.tripletStarted[bool].connect(lambda status: self._data_processor.activate_triplet_detection(status))
+        
+        self._data_processor.delayTripletValues.connect(lambda delays: self._process_delays(delays))
+
+    # logic
+
+    def _process_delay(self, delay):
+        # one delay
+        # if delay > 0:
+        print("show delay -> ")
+        self._stimuli_panel.show_delay(delay)
+    
+    def _process_delays(self, delays):
+        # triplets
+        # if delay > 0:
+        print("show delay -> ")
+        self._stimuli_panel.show_delay(delays)
+
 
     def _finilaze(self):
         self.show()

@@ -32,7 +32,7 @@ class PeakDetectionPanel(QFrame):
         self.spin_box_window_from = create_spin_box(-2000, 0, s.window_ms[0], parent=self)
         self.spin_box_window_until = create_spin_box(0, 2000, s.window_ms[1], parent=self)
 
-        self.spin_box_threshold_mv = create_spin_box(0, 20, s.threshold_mv, step=0.01, data_type="float", parent=self)
+        self.spin_box_threshold_mv = create_spin_box(0, 100, s.threshold_mv, step=0.01, data_type="float", parent=self)
         self.spin_box_threshold_curr = create_spin_box(0, 100000, s.threshold, parent=self)
 
         self.label_units = QLabel("...")

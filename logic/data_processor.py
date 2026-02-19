@@ -27,6 +27,9 @@ class DataProcessor(QObject):
     newDataProcessed = pyqtSignal()
     triggerIdx = pyqtSignal(int)
     peakIdx = pyqtSignal(int)
+
+    delayValue = pyqtSignal(int)
+    delayTripletValues = pyqtSignal(object)
  
     def __init__(self, settings):
         super().__init__()
@@ -44,6 +47,9 @@ class DataProcessor(QObject):
 
         self._trigger = None
 
+        self._ponk_count = 0
+        self._delays = [[], [], []]
+
         self._coef = 1000 / self.settings.Fs
         self._ms_to_sample = lambda x: int(x / 1000 * self.settings.Fs)                                  # функция для пересчёта мс в сэмплы
 
@@ -51,6 +57,7 @@ class DataProcessor(QObject):
     
     def _init_state(self):
         self.create_filters()
+        self._detect_on = False
 
 
     @pyqtSlot(object, float)
@@ -62,22 +69,75 @@ class DataProcessor(QObject):
         Signals:
             newDataProcessed: новая pack добавлена.
         """
-        emg = np.diff(pack[:, self.settings.emg_channels], axis=1).squeeze() 
-
-        s = self.settings.processing_settings
-        if s.do_notch:
-            emg = self.apply_notch(emg)
-        if s.do_lowpass or s.do_highpass:
-            emg = self.apply_butter(emg)
-
-        if s.tkeo:
-            emg = self.calculate_TKEO(emg)
-
+        # emg = np.diff(pack[:, self.settings.emg_channels_monopolar], axis=1).squeeze() 
+        
+        emg = self._process_new_pack(pack)
         self.emg.extend(emg)
 
         self.ts.extend(np.arange(self.timestamp, self.timestamp + emg.shape[0], 1) * self._coef)        # ms
         self.timestamp += emg.shape[0]  # idx
 
+        self._process_trigger(pack)
+
+        self.newDataProcessed.emit()        # --> plot_updater
+        if self._trigger is not None and self._detect_on:
+            self.process_ponk()
+
+    # === ponk detection ===
+    def process_ponk(self):
+        """
+        Набирает данные для нахождения пика и обнаруживает его.
+        """
+        s = self.settings.detection_settings
+        window = s.window_ms
+        
+        if self.ts[-1] >= self._trigger+window[1]: # если накопилось достаточно сэмплов
+
+            mask = np.where((self.ts >= self._trigger+window[0]) & (self.ts <= self._trigger+window[1]))[0]
+            x = np.array(self.emg)[mask]    # выделяем нужный кусок
+
+            threshold = self._define_thr(x)
+            crossings = np.where(x > threshold)[0]      # находим есть ли эмг выше порога
+
+            delay = np.nan
+            if len(crossings) > 0:
+                onset_idx = crossings[0]
+                self.peakIdx.emit(onset_idx+mask[0])    # --> plot_updater
+
+                onset_time = self.ts[onset_idx+mask[0]] # момент времени
+                delay = onset_time - self._trigger
+
+                self.delayValue.emit(int(delay))        # --> to show immediate feedback
+
+                print("DELAY {}".format(delay))
+                
+            else:
+                print("NO PEAK HAS BEEN DETECTED")
+
+            self._delays[self._ponk_count].append(delay)
+            self._ponk_count += 1
+            self._trigger = None 
+
+    
+    def _define_thr(self, x):
+        s = self.settings.detection_settings
+        if s.thr_adaptive:
+            baseline = x[:self._ms_to_sample(s.baseline_ms)]
+            threshold = np.mean(baseline) + s.n_sd * np.std(baseline)
+        else:
+            threshold = s.threshold * (10 ** self.settings.plot_settings.scale_factor)
+        return threshold
+
+    def activate_triplet_detection(self, status):
+        print("detection status: ", status)
+        self._detect_on = status
+        if not status:
+            self._ponk_count = 0         # новый отсчёт поньков
+            self.delayTripletValues.emit(self._delays)
+    
+    
+    # === signal parsing === 
+    def _process_trigger(self, pack):
         ttl = np.array(pack[:, -1], dtype=np.uint8)
         trigger = ((ttl>>self.settings.bit_index) & 0b1).astype(int)
         self.trigger.extend(trigger*1E-3)
@@ -89,54 +149,21 @@ class DataProcessor(QObject):
             self.triggerIdx.emit(idx)
 
             self._trigger = self.ts[idx]       # для обработки поньков  [ms]
+            
+    def _process_new_pack(self, pack):
+        emg = pack[:, self.settings.emg_channels_bipolar].squeeze() 
+        s = self.settings.processing_settings
+        if s.do_notch:
+            emg = self.apply_notch(emg)
+        if s.do_lowpass or s.do_highpass:
+            emg = self.apply_butter(emg)
 
-        self.newDataProcessed.emit()        # --> plot_updater
+        if s.tkeo:
+            emg = self.calculate_TKEO(emg)
+        return emg
 
-        if self._trigger is not None:
-            self.process_ponk()
-
-    def process_ponk(self):
-        s = self.settings.detection_settings
-        window = s.window_ms
-        
-        if self.ts[-1] >= self._trigger+window[1]: # если накопилось достаточно сэмплов
-
-            print(self.ts[-1], self._trigger+window[1])
-            mask = np.where((self.ts >= self._trigger+window[0]) & (self.ts <= self._trigger+window[1]))[0]
-            x = np.array(self.emg)[mask]
-  
-            if s.thr_adaptive:
-                baseline = x[:self._ms_to_sample(s.baseline_ms)]
-                threshold = np.mean(baseline) + s.n_sd * np.std(baseline)
-            else:
-                threshold = s.threshold * (10 ** self.settings.plot_settings.scale_factor)
- 
-            crossings = np.where(x > threshold)[0]
-
-            if len(crossings) > 0:
-                onset_idx = crossings[0]
-                onset_time = self.ts[onset_idx+mask[0]]
-                
-                self.peakIdx.emit(onset_idx+mask[0])
-
-                delay = onset_time - self._trigger 
-                print("DELAY {}".format(delay))
-            else:
-                print("NO PEAK HAS BEEN DETECTED")
-            # min_idx = int(np.argmin(x))
-            # max_idx = int(np.argmax(x))
-
-            # amp = (x[max_idx] - x[min_idx])
-            # ponk_idx = mask[0] + max_idx
-            # delay = self.ts[ponk_idx] - self._trigger
-            # print(amp, delay)
-
-            self._trigger = None 
-
-
+    # === filters creation === 
     def create_notch(self):
-        n_ch = len(self.settings.emg_channels) // 2
-
         s = self.settings.processing_settings
 
         Q = s.notch_fr / s.notch_width
@@ -148,7 +175,6 @@ class DataProcessor(QObject):
         # self.zi_notch = np.tile(zi_base[:, :, np.newaxis], (1, 1, n_ch))
     
     def create_butter(self):
-        n_ch = len(self.settings.emg_channels) // 2
         s = self.settings.processing_settings
         butter_type = None
         if s.do_lowpass and s.do_highpass:
@@ -171,14 +197,7 @@ class DataProcessor(QObject):
         self.create_notch()     # 50 Hz Notch filter
         self.create_butter()        # butterworth filter
 
-    def calculate_TKEO(self, x):
-        tkeo = np.zeros_like(x)
-        tkeo[1:-1] = x[1:-1]**2 - x[:-2] * x[2:]
-
-        tkeo[0] = tkeo[1]    
-        tkeo[-1] = tkeo[-2] 
-        return tkeo
-    
+    # === signal processing === 
     def apply_notch(self, emg):
         emg, self.zi_notch = sosfilt(self.sos_notch, emg, axis=0, zi=self.zi_notch)
         return emg
@@ -186,3 +205,11 @@ class DataProcessor(QObject):
     def apply_butter(self, emg):
         emg, self.zi_butter = sosfilt(self.sos_butter, emg, axis=0, zi=self.zi_butter)
         return emg
+
+    def calculate_TKEO(self, x):
+        tkeo = np.zeros_like(x)
+        tkeo[1:-1] = x[1:-1]**2 - x[:-2] * x[2:]
+
+        tkeo[0] = tkeo[1]    
+        tkeo[-1] = tkeo[-2] 
+        return tkeo

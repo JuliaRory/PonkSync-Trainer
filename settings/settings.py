@@ -4,18 +4,21 @@ from typing import List
 @dataclass
 class StimuliSettings:
     volume: int = 80
-    monitor: int = 3
+    monitor: int = 1
     record: bool = False
     cross_figure: str = "cross_image_white_photomark.png"
     triplet_video: str = "OffsetTriplet_0__soa750_audio-30_freq440_dur50_trigWB.mkv"
-    cross_ms: int = 3000
+    cross_ms: int = 2000
+    show_feedback: int = 500
+    feedback_ms: int = 3000
+
 
 @dataclass
 class PlotSettings:
     ymax: int = 2
     ymin: int = 0
     scale_offset: int = 0
-    scale_factor: int = -10
+    scale_factor: int = -8
     time_range_ms: int = 4000  # ms    
     
 
@@ -38,7 +41,7 @@ class ProcessingSettings:
 @dataclass
 class DetectionSettings:
     window_ms:  List[int] = field(default_factory=lambda: [-500, 500])
-    threshold: int = 10
+    threshold: int = 1
     threshold_mv: float = 0.5
     thr_adaptive: bool = False
     baseline_ms: int = 250
@@ -48,10 +51,11 @@ class DetectionSettings:
 @dataclass
 class Settings:
     data_source: str = "nvx136"  # "SPEED"
-    emg_channels: List[int] = field(default_factory=lambda: [64, 65])
+    emg_channels_monopolar: List[int] = field(default_factory=lambda: [64, 65])
+    emg_channels_bipolar: List[int] = field(default_factory=lambda: [64])
 
     Fs: int = 5000  # Hz
-    bit_index: int = 0
+    bit_index: int = 2
     
     detection_settings: DetectionSettings = field(default_factory=DetectionSettings)
     plot_settings: PlotSettings = field(default_factory=PlotSettings)

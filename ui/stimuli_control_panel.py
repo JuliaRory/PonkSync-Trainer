@@ -19,6 +19,8 @@ class StimuliControlPanel(QFrame):
     """ --- UI для контроля за стимулами --- """
 
     stimuliPresentation = pyqtSignal(bool)      # -> stimuli presentation is on
+    tripletStarted = pyqtSignal(bool)
+
     def __init__(self, settings, parent=None):
         super().__init__(parent)
         self.parent = parent
@@ -91,6 +93,8 @@ class StimuliControlPanel(QFrame):
         self._player_window.volumeChanged.connect(self._on_player_volume_changed)
         self._player_window.playerIsMuted.connect(self._on_player_muted)
 
+        self._player_window.tripletStarted[bool].connect(lambda status: self.tripletStarted.emit(status))
+
     # =======================
     # =====   Логика    =====
     # =======================
@@ -111,13 +115,16 @@ class StimuliControlPanel(QFrame):
 
                 self._update_connections()      # устанавливаем связи с новым окном
 
-
             self.button_stimuli_pause.setEnabled(True)              # кнопка пауза доступна
             self.button_stimuli_pause.setText(PLAY_LABEL)
             self.button_stimuli.setText("Закрыть окно")                # меняем надпись на кнопке "старт"
 
             self._restart_stimuli = False                           
     
+    # == show delay === 
+    def show_delay(self, delay):
+        self._player_window.show_feedback(delay)
+
     # === изменения состояния кнопок === 
     def _change_button_pause_stimuli_text(self):
         status = PLAY_LABEL if self._player_window.is_paused else STOP_LABEL
@@ -162,6 +169,7 @@ class StimuliControlPanel(QFrame):
         message = {"stimulus": filename}
         self.output_stream(json.dumps(message))
 
+    
     # === изменения звука === 
     def _on_player_volume_changed(self, value):
         """изменения от горячих клавиш стрелок вверх-вниз"""

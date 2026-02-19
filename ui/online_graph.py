@@ -25,7 +25,9 @@ class OnlineGraph(QFrame):
         self.line = self.figure.plot(y=self.data_processor.emg, x=self.data_processor.ts)    # отображение "ничего" на месте сигнала миограммы
 
         # self._trigger_line = self.figure.plot(y=self.data_processor.emg, x=self.data_processor.ts, pen="b")    # отображение "ничего" на месте сигнала миограммы
-
+        
+        axis_y = self.figure.getAxis('left')
+        axis_y.autoSIPrefix = False  # Отключаем авто-подбор
         
         self.thr_line = None
         self.trigger_lines = []
