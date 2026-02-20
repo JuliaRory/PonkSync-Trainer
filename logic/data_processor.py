@@ -49,6 +49,7 @@ class DataProcessor(QObject):
 
         self._ponk_count = 0
         self._delays = [[], [], []]
+        self._triplets_counter = 0
 
         self._coef = 1000 / self.settings.Fs
         self._ms_to_sample = lambda x: int(x / 1000 * self.settings.Fs)                                  # функция для пересчёта мс в сэмплы
@@ -80,7 +81,7 @@ class DataProcessor(QObject):
         self._process_trigger(pack)
 
         self.newDataProcessed.emit()        # --> plot_updater
-        if self._trigger is not None and self._detect_on:
+        if (self._trigger is not None) and (self._ponk_count < 3) and self._detect_on:
             self.process_ponk()
 
     # === ponk detection ===
@@ -98,7 +99,6 @@ class DataProcessor(QObject):
 
             threshold = self._define_thr(x)
             crossings = np.where(x > threshold)[0]      # находим есть ли эмг выше порога
-
             delay = np.nan
             if len(crossings) > 0:
                 onset_idx = crossings[0]
@@ -114,7 +114,8 @@ class DataProcessor(QObject):
             else:
                 print("NO PEAK HAS BEEN DETECTED")
 
-            self._delays[self._ponk_count].append(delay)
+            print("PONK COUNTER", self._ponk_count)
+            self._delays[self._ponk_count].append(delay)        # --> triplets
             self._ponk_count += 1
             self._trigger = None 
 
@@ -129,17 +130,45 @@ class DataProcessor(QObject):
         return threshold
 
     def activate_triplet_detection(self, status):
-        print("detection status: ", status)
+        # False - триплет окончен, True - триплет начался. 
+        # print("TRIPLET HAS BEEN FINISHED?", not status)
         self._detect_on = status
         if not status:
             self._ponk_count = 0         # новый отсчёт поньков
-            self.delayTripletValues.emit(self._delays)
+            
+            print(self._delays)
+            # print(np.array(([np.array(delay) for delay in self._delays])))
+            delays = np.array(([np.array(delay).T for delay in self._delays])).T
+            # delays = np.array(self._delays).T     # для проведения манипуляций
+            print(delays)
+            
+            s = self.settings.stimuli_settings
+            if s.feedback_mode_curr == 0:   # после каждой попытки
+                print("--> SHOW", delays[-1])
+                self.delayTripletValues.emit(delays[-1])        # показать последнюю попытку
+            elif s.feedback_mode_curr == 1:     # накапливать n штук
+                self._triplets_counter += 1
+                if self._triplets_counter >= s.feedback_n:
+                    toshow = np.nanmean(delays[-s.feedback_n:], axis=0)
+                    print("--> SHOW", toshow)
+                    self.delayTripletValues.emit(toshow)        # показать среднее n попыток
+                    self._triplets_counter = 0
+            else:       # показывать если отклонение превышает заданные границы
+                d1 = delays[-1][0]
+                d2 = delays[-1][1]
+                d3 = delays[-1][2]
+                limits = s.delay_limit
+                if (abs(d1) > limits[0]) or (abs(d2) > limits[1]) or (abs(d3) > limits[2]):
+                    print("--> SHOW", delays[-1])
+                    self.delayTripletValues.emit(delays[-1])        # показать последнюю попытку
     
     
     # === signal parsing === 
     def _process_trigger(self, pack):
+
         ttl = np.array(pack[:, -1], dtype=np.uint8)
-        trigger = ((ttl>>self.settings.bit_index) & 0b1).astype(int)
+        bit = self.settings.detection_settings.bit
+        trigger = ((ttl>>bit) & 0b1).astype(int)
         self.trigger.extend(trigger*1E-3)
 
         trigger_diff = np.diff(trigger)
@@ -147,7 +176,6 @@ class DataProcessor(QObject):
         if len(event) != 0:
             idx =-(len(trigger) - event[0])
             self.triggerIdx.emit(idx)
-
             self._trigger = self.ts[idx]       # для обработки поньков  [ms]
             
     def _process_new_pack(self, pack):

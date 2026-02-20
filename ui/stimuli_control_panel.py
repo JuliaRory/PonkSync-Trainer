@@ -53,6 +53,13 @@ class StimuliControlPanel(QFrame):
         self.button_stimuli = create_button(text='Запуск', disabled=False, parent=self, w=100)
         self.button_stimuli_pause = create_button(text=PLAY_LABEL, disabled=True, parent=self)
 
+        self.combo_box_feedback_mode = create_combo_box(self.settings.feedback_mode, curr_item_idx=self.settings.feedback_mode_curr, parent=self)
+        self.spin_box_feedback_n = create_spin_box(0, 30, self.settings.feedback_n, parent=self)
+        delay_limit = self.settings.delay_limit
+        self.spin_box_limit1 = create_spin_box(0, 1000, delay_limit[0], parent=self)
+        self.spin_box_limit2 = create_spin_box(0, 1000, delay_limit[1], parent=self)
+        self.spin_box_limit3 = create_spin_box(0, 1000, delay_limit[2], parent=self)
+
         self.label_stimuli_idx = QLabel("", self)
         self.label_stimuli_idx.setObjectName("label_stimulus_idx")
 
@@ -64,12 +71,25 @@ class StimuliControlPanel(QFrame):
         layout_start = create_hbox([self.button_stimuli, self.button_stimuli_pause])
         layout_monitor = create_hbox([QLabel("монитор", self), self.spin_box_monitor])
         layout_nvx = create_hbox([self.check_box_stimuli_record])
+
+        layout_feedback_mode = create_hbox([QLabel("Режим ОС", self), self.combo_box_feedback_mode])
+        layout_feedback_n = create_hbox([QLabel("N эпох", self), self.spin_box_feedback_n])
+        layout_delay_limit1 = create_hbox([QLabel("поньк #1:", self), self.spin_box_limit1, QLabel("мс", self)])
+        layout_delay_limit2 = create_hbox([QLabel("поньк #2:", self), self.spin_box_limit2, QLabel("мс", self)])
+        layout_delay_limit3 = create_hbox([QLabel("поньк #3:", self), self.spin_box_limit3, QLabel("мс", self)])
         
         layout = QVBoxLayout(self)
         layout.addLayout(layout_start)
         layout.addLayout(layout_monitor)
         layout.addLayout(layout_nvx)
         layout.addWidget(self.label_stimuli_idx)
+        layout.addLayout(layout_feedback_mode)
+        layout.addLayout(layout_feedback_n)
+        layout.addLayout(layout_delay_limit1)
+        layout.addLayout(layout_delay_limit2)
+        layout.addLayout(layout_delay_limit3)
+        
+        
 
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 

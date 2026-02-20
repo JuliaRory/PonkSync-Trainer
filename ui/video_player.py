@@ -2,6 +2,7 @@ import sys, os
 
 import vlc
 import time
+import numpy as np
 
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer
@@ -99,7 +100,7 @@ class StimuliPresentation_one_by_one(QWidget):
 
         # === Подготовка последовательности ===
         self.media = self._instance.media_new(self._triplet_video_path)
-        self.media.add_option(':start-time=1.56')
+        # self.media.add_option(':start-time=1.56')
         self.media.parse_async()  # preload
         
     def _configure_video_widget(self):
@@ -138,14 +139,14 @@ class StimuliPresentation_one_by_one(QWidget):
     def _configure_feedback_widget(self):
         self._feedback_widget = QLabel(self)
         self._feedback_widget.setStyleSheet("""
-            font-size: 40px;
+            font-size: 50px;
             font-weight: bold;
             color: blue;
         """)
 
-        x = int(self.width() // 2 - 250)
+        x = int(self.width() // 2 - 800)
         y = int(0.2 * self.height())
-        width = 500
+        width = 1500
         height = 100
 
         self._feedback_widget.setGeometry(x, y, width, height)
@@ -194,6 +195,7 @@ class StimuliPresentation_one_by_one(QWidget):
             self._placeholder_widget.show()
             self.tripletStarted.emit(False)
             if self.show_delay:
+                
                 QTimer.singleShot(self._show_feedback_ms, self._check_feedback)
             else:
                 QTimer.singleShot(self._cross_dur_ms, self._play_next_video)
@@ -201,7 +203,12 @@ class StimuliPresentation_one_by_one(QWidget):
             QTimer.singleShot(50, self._check_video_end)
     
     def _check_feedback(self):
-        self._feedback_widget.setText(f"Delay: {self.delay_value} ms.")
+        
+        d1 = int(self.delay_value[0]) if np.isfinite(self.delay_value[0]) else np.nan
+        d2 = int(self.delay_value[1]) if np.isfinite(self.delay_value[1]) else np.nan
+        d3 = int(self.delay_value[2]) if np.isfinite(self.delay_value[2]) else np.nan
+        text = f"Поньк #1: {d1} мс. #2: {d2} мс. #3: {d3} мс."
+        self._feedback_widget.setText(text)
         self._feedback_widget.show()
         self.show_delay = False
         QTimer.singleShot(self._feedback_ms, self._show_cross)
