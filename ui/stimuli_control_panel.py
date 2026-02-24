@@ -19,7 +19,7 @@ class StimuliControlPanel(QFrame):
     """ --- UI для контроля за стимулами --- """
 
     stimuliPresentation = pyqtSignal(bool)      # -> stimuli presentation is on
-    tripletStarted = pyqtSignal(bool)
+    stimuliEnded = pyqtSignal()
 
     def __init__(self, settings, parent=None):
         super().__init__(parent)
@@ -46,12 +46,15 @@ class StimuliControlPanel(QFrame):
         
         self._settings_panel = QFrame(self)
         
-        self.spin_box_monitor = create_spin_box(1, 3, self.settings.monitor, parent=self)
-        
-        self.check_box_stimuli_record = create_check_box(self.settings.record, 'Запись NVX', parent=self)
-
-        self.button_stimuli = create_button(text='Запуск', disabled=False, parent=self, w=100)
+        self.button_stimuli = create_button(text='Открыть стимулы', disabled=False, parent=self, w=100)
         self.button_stimuli_pause = create_button(text=PLAY_LABEL, disabled=True, parent=self)
+
+        self.combo_box_stimuli = create_combo_box(self.settings.stimuli, curr_item_idx=self.settings.stimuli_curr, parent=self)
+        self.spin_box_stimuli_n = create_spin_box(0, 100, self.settings.stimuli_n, parent=self)
+        self.check_box_stimuli_inf = create_check_box(self.settings.stimuli_inf, '∞', parent=self)
+
+        self.spin_box_monitor = create_spin_box(1, 3, self.settings.monitor, parent=self)
+        self.check_box_stimuli_record = create_check_box(self.settings.record, 'Запись NVX', parent=self)
 
         self.combo_box_feedback_mode = create_combo_box(self.settings.feedback_mode, curr_item_idx=self.settings.feedback_mode_curr, parent=self)
         self.spin_box_feedback_n = create_spin_box(0, 30, self.settings.feedback_n, parent=self)
@@ -69,6 +72,8 @@ class StimuliControlPanel(QFrame):
     def _setup_layout(self):        
 
         layout_start = create_hbox([self.button_stimuli, self.button_stimuli_pause])
+        layout_stimuli = create_hbox([self.combo_box_stimuli, QLabel("N:", self), self.spin_box_stimuli_n, QLabel("или", self), self.check_box_stimuli_inf])
+
         layout_monitor = create_hbox([QLabel("монитор", self), self.spin_box_monitor])
         layout_nvx = create_hbox([self.check_box_stimuli_record])
 
@@ -80,6 +85,7 @@ class StimuliControlPanel(QFrame):
         
         layout = QVBoxLayout(self)
         layout.addLayout(layout_start)
+        layout.addLayout(layout_stimuli)
         layout.addLayout(layout_monitor)
         layout.addLayout(layout_nvx)
         layout.addWidget(self.label_stimuli_idx)
@@ -113,7 +119,7 @@ class StimuliControlPanel(QFrame):
         self._player_window.volumeChanged.connect(self._on_player_volume_changed)
         self._player_window.playerIsMuted.connect(self._on_player_muted)
 
-        self._player_window.tripletStarted[bool].connect(lambda status: self.tripletStarted.emit(status))
+        self._player_window.stimuliEnded.connect(lambda: self.stimuliEnded.emit())
 
     # =======================
     # =====   Логика    =====

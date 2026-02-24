@@ -3,6 +3,7 @@ from dataclasses import is_dataclass
 import json
 from dataclasses import asdict
 
+from PyQt5.QtWidgets import QWidget
 from numpy import sqrt
 
 class SettingsHandler:
@@ -33,6 +34,7 @@ class SettingsHandler:
         self._scale_panel = self.ui._scale_panel
         self._peak_panel = self.ui._peak_panel
         self._graph = self.ui._figure_panel
+        self._stimuli_panel = self.ui._stimuli_panel
 
         self._setup_units()
         self._update_thr()
@@ -53,6 +55,18 @@ class SettingsHandler:
 
         self._peak_panel.spin_box_threshold_curr.valueChanged[int].connect(self._update_threshold)
         self._peak_panel.spin_box_threshold_mv.valueChanged[float].connect(self._update_threshold_mv)
+
+        self._stimuli_panel.combo_box_stimuli.currentIndexChanged[int].connect(self._update_stimuli)
+        self._stimuli_panel.spin_box_stimuli_n.valueChanged[int].connect(self._update_stimuli_n)
+        self._stimuli_panel.check_box_stimuli_inf.stateChanged.connect(self._update_stimuli_inf)
+        self._stimuli_panel.spin_box_monitor.valueChanged[int].connect(self._update_monitor)
+        self._stimuli_panel.check_box_stimuli_record.stateChanged.connect(self._update_record_status)
+        self._stimuli_panel.combo_box_feedback_mode.currentIndexChanged[int].connect(self._update_feedback_mode)
+        self._stimuli_panel.spin_box_feedback_n.valueChanged[int].connect(self._update_feedback_n)
+        self._stimuli_panel.spin_box_limit1.valueChanged[int].connect(self._update_limit1)
+        self._stimuli_panel.spin_box_limit2.valueChanged[int].connect(self._update_limit2)
+        self._stimuli_panel.spin_box_limit3.valueChanged[int].connect(self._update_limit3)
+
 
     # === plot settings === 
 
@@ -109,6 +123,47 @@ class SettingsHandler:
         text = f"<span style='font-size: 14pt;'>&times; 10<sup>{factor}</sup></span>"
         self._peak_panel.label_units.setText(text)
     
+
+    # === stimuli settings === 
+    def _update_stimuli(self, index):
+        self.settings.stimuli_settings.stimuli_curr = index
+        pw = getattr(self.ui._stimuli_panel, "_player_window", None)
+        if isinstance(pw, QWidget) and not pw.isHidden():
+            self.ui._stimuli_panel._player_window.set_video_path()
+            self.ui._stimuli_panel._player_window.change_stimuli()
+    
+    
+    def _update_stimuli_n(self, n): # DOESNOT INPLEMENTED AT ALL
+        self.settings.stimuli_settings.stimuli_n = n
+    
+    def _update_stimuli_inf(self, status):
+        self.settings.stimuli_settings.stimuli_inf = status
+    
+    def _update_monitor(self, n):
+        self.settings.stimuli_settings.monitor = n
+        pw = getattr(self.ui._stimuli_panel, "_player_window", None)
+        if isinstance(pw, QWidget) and not pw.isHidden():
+            self.ui._stimuli_panel._player_window.set_monitor()
+        
+    def _update_record_status(self, status): # DOESNOT INPLEMENTED AT ALL
+        self.settings.stimuli_settings.record = status
+        # --> signal to change record status DOESNOT INPLEMENTED AT ALL
+
+    def _update_feedback_mode(self, index):
+        self.settings.stimuli_settings.feedback_mode_curr = index
+        # --> signal to change feedback mode in video_player
+    
+    def _update_feedback_n(self, n):
+        self.settings.stimuli_settings.feedback_n = n
+    
+    def _update_limit1(self, value):
+        self.settings.stimuli_settings.delay_limit[0] = value
+    
+    def _update_limit2(self, value):
+        self.settings.stimuli_settings.delay_limit[1] = value
+    
+    def _update_limit3(self, value):
+        self.settings.stimuli_settings.delay_limit[2] = value
 
     # === filter settings === 
     def _update_low_freq(self, value):

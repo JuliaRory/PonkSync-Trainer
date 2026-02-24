@@ -4,10 +4,17 @@ from typing import List
 @dataclass
 class StimuliSettings:
     volume: int = 80
-    monitor: int = 2
+    monitor: int = 3
     record: bool = False
-    cross_figure: str = "cross_image_white_photomark_left.png"
-    triplet_video: str = "OffsetTriplet_+750_soa750_audio_30_freq440_dur50_trigWB_3ponk_trig_left.mkv"
+    cross_figure: str = "cross_image_white_photomark.png"
+    background_figure: str = "background_white_photomark.png"
+    triplet_video: str = "PS__animatedTriplet_750.mkv"
+    single_video: str = "PS__animatedSingle_750.mkv"
+    SRT_video: str = "PS__SRT.mkv" 
+    stimuli: List[str] = field(default_factory=lambda: ["Триплеты", "Одиночные", "SRT"])
+    stimuli_curr: int = 1
+    stimuli_n: int = 10
+    stimuli_inf: bool = True
     cross_ms: int = 2000
     show_feedback: int = 500
     feedback_ms: int = 3000
@@ -15,14 +22,16 @@ class StimuliSettings:
     feedback_mode_curr: int = 0
     delay_limit: List[int] = field(default_factory=lambda: [50, 50, 50])
     feedback_n: int = 2
+    feedback_w: int = 460
+    feedback_h: int = 460
 
 
 @dataclass
 class PlotSettings:
     ymax: int = 10
-    ymin: int = 0
+    ymin: int = -10
     scale_offset: int = 0
-    scale_factor: int = -10
+    scale_factor: int = -5
     time_range_ms: int = 4000  # ms    
     
 
@@ -32,21 +41,21 @@ class ProcessingSettings:
     notch_width: int = 1
     butter_order: int = 4
     freq_low: int = 5
-    freq_high: int = 75
+    freq_high: int = 40
 
     do_lowpass: bool = True
     do_highpass: bool = True
     do_butter: bool = True
     do_notch: bool = True
     
-    tkeo: bool = True
+    tkeo: bool = False
     extra_samples: int = 500
 
 @dataclass
 class DetectionSettings:
-    bit: int = 0
-    window_ms:  List[int] = field(default_factory=lambda: [-300, 100])
-    threshold: int = 1
+    bit: int = 2
+    window_ms:  List[int] = field(default_factory=lambda: [-375, 375])
+    threshold: int = 4
     threshold_mv: float = 0.5
     thr_adaptive: bool = False
     baseline_ms: int = 250

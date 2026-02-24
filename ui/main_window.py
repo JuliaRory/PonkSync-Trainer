@@ -91,9 +91,9 @@ class MainWindow(QWidget):
         self._data_processor.peakIdx.connect(lambda idx: self._plot_updater.plot_peak(idx))
 
         # self._data_processor.delayValue[int].connect(lambda delay: self._process_delay(delay))
-        self._stimuli_panel.tripletStarted[bool].connect(lambda status: self._data_processor.activate_triplet_detection(status))
+        self._stimuli_panel.stimuliEnded.connect(lambda: self._data_processor.get_delays())
         
-        self._data_processor.delayTripletValues.connect(lambda delays: self._process_delays(delays))
+        self._data_processor.delayValues.connect(lambda delays: self._process_delays(delays))
 
     # logic
 

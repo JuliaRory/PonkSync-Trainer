@@ -4,10 +4,12 @@ import vlc
 import time
 import numpy as np
 
-from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel, QStackedWidget
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer
 from PyQt5.QtGui import QPixmap
 
+from ui.feedback_graph import FeedbackGraph
+import logging
 
 # воспроизведение стимулов идёт через VLC плеер (https://www.videolan.org/vlc/) <-- он должен быть установлен на компьютер (!!!) 
 # на питоне для этого устанавливается библиотека python-vlc (https://pypi.org/project/python-vlc/)
@@ -38,22 +40,17 @@ class StimuliPresentation_one_by_one(QWidget):
     playerIsMuted = pyqtSignal()
     currIdxChanged = pyqtSignal(int)
     _videoEnded = pyqtSignal()
-    tripletStarted = pyqtSignal(bool)       # --> data_processor
+    stimuliEnded = pyqtSignal()       # --> stimuli_control_panel --> main_window --> data_processor
 
     stimulus = pyqtSignal(str)
     
     def __init__(self, settings=None):
         super().__init__()  
 
+        self.logger = logging.getLogger(__name__)
         self._volume = settings.volume
         self.settings = settings 
         self.show_delay = False
-
-        # Настройка экрана
-        screens = QApplication.instance().screens()
-        target_monitor = screens[self.settings.monitor - 1].geometry()
-        self.setGeometry(target_monitor)
-        self.showFullScreen()
 
         self._init_state()
     
@@ -69,12 +66,36 @@ class StimuliPresentation_one_by_one(QWidget):
         self._counter = 0
         
         self._cross_figure_path = os.path.join(r"resources\stimuli", self.settings.cross_figure)
-        self._triplet_video_path = os.path.join(r"resources\stimuli", self.settings.triplet_video)
+        
         # final_fig_files = os.listdir(r"resources\final_fig")
         # self.final_pic_path = os.path.join(r"resources\final_fig", random.choice(final_fig_files))
 
+        self.set_monitor()
         self._configure_player()
-               
+    
+    def set_monitor(self):
+        # Настройка экрана
+        screens = QApplication.instance().screens()
+        target_monitor = screens[self.settings.monitor - 1].geometry()
+        self.setGeometry(target_monitor)
+        self.showFullScreen()
+
+    def set_video_path(self):
+        stimuli = self.settings.stimuli_curr
+        if stimuli == 0:
+            video = self.settings.triplet_video
+        elif stimuli == 1:
+            video = self.settings.single_video
+        elif stimuli == 2:
+            video = self.settings.SRT_video
+
+        self._video_path = os.path.join(r"resources\stimuli", video)
+        # === Подготовка последовательности ===
+        self.media = self._instance.media_new(self._video_path)
+        # self.media.add_option(':start-time=1.56')
+        self.media.parse_async()  # preload
+
+
     def _configure_player(self):
         # ===  VLC player === 
         self._instance = vlc.Instance(
@@ -90,43 +111,77 @@ class StimuliPresentation_one_by_one(QWidget):
         events = self._player.event_manager()
         events.event_attach(vlc.EventType.MediaPlayerEndReached, self._on_end_reached)
 
+        # === background === 
+        self._configure_background_label()
+
         # === Видео виджет ===
         self._configure_video_widget()
         
-        # === Placeholder widget поверх всего ===
-        self._configure_placeholder_widget()
+        # === Виджет с крестом ===
+        self._configure_cross_label()
 
+        # === Feedback widget === 
         self._configure_feedback_widget()
 
-        # === Подготовка последовательности ===
-        self.media = self._instance.media_new(self._triplet_video_path)
-        # self.media.add_option(':start-time=1.56')
-        self.media.parse_async()  # preload
-        
-    def _configure_video_widget(self):
-        
-        self._video_widget = QWidget(self)
-        self._video_widget.setStyleSheet("background-color: black;")
+        # === setup layout === 
+        self._setup_layout()
+
+        # === Установить видос === 
+        self.set_video_path()
+    
+    
+    def _setup_layout(self):
+        self._stacked = QStackedWidget()      # позволяет просто переключаться между виджетами
+
+        self._stacked.addWidget(self._video_widget)      # индекс 0
+        self._stacked.addWidget(self._feedback_widget)   # индекс 1
+        self._stacked.addWidget(self._cross_widget)      # индекс 1
+
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0,0,0,0)
-        layout.addWidget(self._video_widget)
+
+        layout.addWidget(self._stacked)
+
+        self._stacked.setCurrentIndex(1)
+
+    def _configure_background_label(self):
+        background_path = os.path.join(r"resources\stimuli", self.settings.background_figure)
+        self._background_label = QLabel(self)
+        self._background = QPixmap(background_path).scaled(
+                self.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation
+            )
+        self._background_label.setPixmap(self._background)
+        self._background_label.setGeometry(self.rect())
+        self._background_label.setAlignment(Qt.AlignCenter)
+        self._background_label.setStyleSheet("background-color: black;")
+        self._background_label.show()
+
+    def _configure_video_widget(self):
+        self._video_widget = QWidget(self)
+        self._video_widget.setStyleSheet("background-color: black;")
+        # layout = QVBoxLayout(self)
+        # layout.setContentsMargins(0,0,0,0)
+        # layout.addWidget(self._video_widget)
 
         winid = int(self._video_widget.winId())
         self._player.set_hwnd(winid)
 
-    def _configure_placeholder_widget(self):
-        self._placeholder_widget = QLabel(self)
+    def _configure_cross_label(self):
+        self._cross_widget = QWidget(self)
+        layout = QVBoxLayout(self._cross_widget)
+        layout.setContentsMargins(0, 0, 0, 0)
+        
+        self._cross_label = QLabel(self._cross_widget)
 
         self._main_cross_pic = QPixmap(self._cross_figure_path).scaled(
                 self.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation
             )
 
-        self._placeholder_widget.setPixmap(self._main_cross_pic)
+        self._cross_label.setPixmap(self._main_cross_pic)
         
-        self._placeholder_widget.setGeometry(self.rect())
-        self._placeholder_widget.setAlignment(Qt.AlignCenter)
-        self._placeholder_widget.setStyleSheet("background-color: black;")
-        self._placeholder_widget.show()
+        self._cross_label.setGeometry(self.rect())
+        self._cross_label.setAlignment(Qt.AlignCenter)
+        self._cross_label.setStyleSheet("background:transparent;")
 
         self._cross_dur_ms = self.settings.cross_ms      # проигрвать крест 
 
@@ -137,25 +192,41 @@ class StimuliPresentation_one_by_one(QWidget):
         print('[VLC player]: press Space to start.')
 
     def _configure_feedback_widget(self):
-        self._feedback_widget = QLabel(self)
-        self._feedback_widget.setStyleSheet("""
-            font-size: 50px;
-            font-weight: bold;
-            color: blue;
-        """)
+        self._feedback_widget = QWidget(self)
 
-        x = int(self.width() // 2 - 800)
-        y = int(0.2 * self.height())
-        width = 1500
-        height = 100
+        w, h = self.settings.feedback_w, self.settings.feedback_h
 
-        self._feedback_widget.setGeometry(x, y, width, height)
-        self._feedback_widget.setAlignment(Qt.AlignCenter)
+        self._feedback_graphs = [FeedbackGraph(w, h, self._feedback_widget), FeedbackGraph(w, h, self._feedback_widget), FeedbackGraph(w, h, self._feedback_widget)]
+        center_y = self.height() // 2 - h // 2
+        center_x = self.width() // 2 - w // 2
+        self._feedback_graphs[0].move(center_x-w, center_y)
+        self._feedback_graphs[1].move(center_x, center_y)
+        self._feedback_graphs[2].move(center_x+w, center_y)
+
+        center_x, center_y = self.width() // 2 - w // 2, self.height() // 2 - h // 2
+        w, h = int(1.1 * w), int(1.1 * h)
+        self._feedback_graph = FeedbackGraph(w, h, self._feedback_widget)
+        self._feedback_graph.move(center_x, center_y)
+
+        self.change_stimuli()
+        # self._feedback_graph.setGeometry(x, y, width, height)
 
         self._feedback_ms = self.settings.feedback_ms      # проигрвать крест 
         self._show_feedback_ms = self.settings.show_feedback 
+    
+    def change_stimuli(self):
+        if self.settings.stimuli_curr == 0:
+            self._feedback_graph.hide()
+            for graph in self._feedback_graphs:
+                graph.show()
+        else:
+            for graph in self._feedback_graphs:
+                graph.hide()
+            self._feedback_graph.show()
         
-
+        stimuli_mode = self.settings.stimuli[self.settings.stimuli_curr]
+        self.logger.info(f"Stimuli mode: {stimuli_mode}")
+    
     # ===============================
     # === цикл проигрывания видео ===
     # ===============================
@@ -165,14 +236,18 @@ class StimuliPresentation_one_by_one(QWidget):
             print('[VLC player]: stimuli presentation has been stopped.')
             return
 
-        self._placeholder_widget.show()
+        self._stacked.setCurrentIndex(2)
+
+        # self._cross_label.show()
         
+        self.logger.info(f"show stimuli")
+
         # запустить следующее видео
         self._player.set_media(self.media)
         self._player.audio_set_volume(self._volume)
 
-        self.tripletStarted.emit(True)
         self._player.play()
+        self._stacked.setCurrentIndex(0)
 
         # подготовить следующее видео
         self._current_index += 1
@@ -181,8 +256,8 @@ class StimuliPresentation_one_by_one(QWidget):
         self._is_paused = False
 
         # Скрываем placeholder через 50ms после старта VLC
-        delay = 50
-        QTimer.singleShot(delay, self._placeholder_widget.hide)
+        # delay = 50
+        # QTimer.singleShot(delay, self._cross_label.hide)
 
         # Проверяем окончание видео каждые 50ms
         QTimer.singleShot(50, self._check_video_end)
@@ -190,34 +265,53 @@ class StimuliPresentation_one_by_one(QWidget):
     def _check_video_end(self):
         if self._stopped:
             return  # больше ничего не делаем
-        if self._player.get_state() == vlc.State.Ended:
+        if self._player.get_state() == vlc.State.Ended:     # Если видео закончилось
             # Сразу показываем placeholder перед следующим видео
-            self._placeholder_widget.show()
-            self.tripletStarted.emit(False)
+            # self._cross_label.show()
+            # self._stacked.setCurrentIndex(2)
+
+            self.stimuliEnded.emit()    # --> stimuli_control_panel --> main_window --> data_processor
+
             if self.show_delay:
-                
                 QTimer.singleShot(self._show_feedback_ms, self._check_feedback)
             else:
                 QTimer.singleShot(self._cross_dur_ms, self._play_next_video)
         else:
             QTimer.singleShot(50, self._check_video_end)
-    
+
+    def _update_feedback_graph(self, graph, value):
+        if np.isfinite(value):
+            status = True
+            graph.set_triangle_params(vertex_x=value)
+        else:
+            status = False
+        graph.show_triangle = status
+        graph.show_measure_line = status
+        graph.show_label = status
+
     def _check_feedback(self):
-        
-        d1 = int(self.delay_value[0]) if np.isfinite(self.delay_value[0]) else np.nan
-        d2 = int(self.delay_value[1]) if np.isfinite(self.delay_value[1]) else np.nan
-        d3 = int(self.delay_value[2]) if np.isfinite(self.delay_value[2]) else np.nan
-        text = f"Поньк #1: {d1} мс. #2: {d2} мс. #3: {d3} мс."
-        self._feedback_widget.setText(text)
-        self._feedback_widget.show()
+        self._stacked.setCurrentIndex(1)        # switch to feedback widget
+
+        print("TO SHOW", self.delay_value)
+        if self.settings.stimuli_curr == 0:
+            d1 = int(self.delay_value[0]) if np.isfinite(self.delay_value[0]) else np.nan
+            d2 = int(self.delay_value[1]) if np.isfinite(self.delay_value[1]) else np.nan
+            d3 = int(self.delay_value[2]) if np.isfinite(self.delay_value[2]) else np.nan
+            for i, d in enumerate([d1, d2, d3]):
+                graph = self._feedback_graphs[i]
+                self._update_feedback_graph(graph, d)
+        else:
+            d = int(self.delay_value[0]) if np.isfinite(self.delay_value[0]) else np.nan
+            self._update_feedback_graph(self._feedback_graph, d)
+
+        # QTimer.singleShot(50, self._cross_label.hide)
+
         self.show_delay = False
         QTimer.singleShot(self._feedback_ms, self._show_cross)
 
     
     def _show_cross(self):
-        self._feedback_widget.hide()
-        self._feedback_widget.repaint()
-        self._placeholder_widget.show()
+        self._stacked.setCurrentIndex(2)
         QTimer.singleShot(self._cross_dur_ms, self._play_next_video)
         
 
@@ -258,6 +352,7 @@ class StimuliPresentation_one_by_one(QWidget):
     def show_feedback(self, delay):
         self.show_delay = True
         self.delay_value = delay
+    
 
     # === показ стимулов ===
     def _on_space_pressed(self):
@@ -303,7 +398,7 @@ class StimuliPresentation_one_by_one(QWidget):
         self.stimulus.emit(self.video_names[self.order[self._current_index]-1])
 
         self._prepare_next_video()
-        self._placeholder_widget.show()
+        self._cross_label.show()
     
     def finish(self):
         print("[VLC player]: finish the stimuli presentation and close the player.")

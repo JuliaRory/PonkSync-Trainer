@@ -1,0 +1,19 @@
+2026-02-24 19:57:19 - root - INFO - logging.py:54 - Логирование инициализировано. Файл: logs\app_20260224_195719.log
+2026-02-24 19:57:19 - root - INFO - start.py:20 - ==================================================
+2026-02-24 19:57:19 - root - INFO - start.py:21 - ЗАПУСК ПРИЛОЖЕНИЯ
+2026-02-24 19:57:19 - root - INFO - start.py:22 - ==================================================
+2026-02-24 19:57:35 - ui.video_player - INFO - video_player.py:228 - Stimuli mode: Одиночные
+2026-02-24 19:57:36 - ui.video_player - INFO - video_player.py:243 - show stimuli
+2026-02-24 19:57:38 - logic.data_processor - INFO - data_processor.py:168 - Delays: [nan].
+2026-02-24 19:57:44 - ui.video_player - INFO - video_player.py:243 - show stimuli
+2026-02-24 19:57:46 - logic.data_processor - INFO - data_processor.py:168 - Delays: [284.].
+2026-02-24 19:57:51 - ui.video_player - INFO - video_player.py:243 - show stimuli
+2026-02-24 19:57:57 - ui.video_player - INFO - video_player.py:228 - Stimuli mode: Триплеты
+2026-02-24 19:57:58 - logic.data_processor - INFO - data_processor.py:168 - Delays: [ nan 284.  nan].
+2026-02-24 19:58:04 - ui.video_player - INFO - video_player.py:243 - show stimuli
+2026-02-24 19:58:07 - logic.data_processor - INFO - data_processor.py:168 - Delays: [-77.4 -69.    nan].
+2026-02-24 19:58:13 - ui.video_player - INFO - video_player.py:243 - show stimuli
+2026-02-24 19:58:16 - logic.data_processor - INFO - data_processor.py:168 - Delays: [nan nan nan].
+2026-02-24 19:58:22 - ui.video_player - INFO - video_player.py:243 - show stimuli
+2026-02-24 19:58:25 - logic.data_processor - INFO - data_processor.py:168 - Delays: [ 150.4  -63.8 -131.2].
+2026-02-24 19:58:30 - ui.video_player - INFO - video_player.py:243 - show stimuli

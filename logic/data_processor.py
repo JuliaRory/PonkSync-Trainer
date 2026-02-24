@@ -8,6 +8,7 @@ from settings.settings import Settings
 
 from utils.averaging_math import RollingMean, RollingMedian, RollingTrimMean
 
+import logging
 
 class DataProcessor(QObject):
     """
@@ -29,11 +30,12 @@ class DataProcessor(QObject):
     peakIdx = pyqtSignal(int)
 
     delayValue = pyqtSignal(int)
-    delayTripletValues = pyqtSignal(object)
+    delayValues = pyqtSignal(object)    # --> main_window --> stimuli_panel --> video_player
  
     def __init__(self, settings):
         super().__init__()
         self.settings = settings    # settings
+        self.logger = logging.getLogger(__name__)
 
         # для хранения данных
         time_range_ms = self.settings.plot_settings.time_range_ms
@@ -48,8 +50,8 @@ class DataProcessor(QObject):
         self._trigger = None
 
         self._ponk_count = 0
-        self._delays = [[], [], []]
-        self._triplets_counter = 0
+        self._delays = []
+        self._feedback_counter = 0  # для показа N усреднённого фидбэка
 
         self._coef = 1000 / self.settings.Fs
         self._ms_to_sample = lambda x: int(x / 1000 * self.settings.Fs)                                  # функция для пересчёта мс в сэмплы
@@ -81,9 +83,18 @@ class DataProcessor(QObject):
         self._process_trigger(pack)
 
         self.newDataProcessed.emit()        # --> plot_updater
-        if (self._trigger is not None) and (self._ponk_count < 3) and self._detect_on:
+        if self._trigger is not None:
             self.process_ponk()
 
+    def _define_thr(self, x):
+        s = self.settings.detection_settings
+        if s.thr_adaptive:
+            baseline = x[:self._ms_to_sample(s.baseline_ms)]
+            threshold = np.mean(baseline) + s.n_sd * np.std(baseline)
+        else:
+            threshold = s.threshold * (10 ** self.settings.plot_settings.scale_factor)
+        return threshold
+    
     # === ponk detection ===
     def process_ponk(self):
         """
@@ -93,12 +104,16 @@ class DataProcessor(QObject):
         window = s.window_ms
         
         if self.ts[-1] >= self._trigger+window[1]: # если накопилось достаточно сэмплов
+            # self.logger.info(f"Trigger processed at {self.ts[-1]} ms.")
 
             mask = np.where((self.ts >= self._trigger+window[0]) & (self.ts <= self._trigger+window[1]))[0]
             x = np.array(self.emg)[mask]    # выделяем нужный кусок
 
             threshold = self._define_thr(x)
+            # self.logger.info(f"Threshold is {threshold}.")
+
             crossings = np.where(x > threshold)[0]      # находим есть ли эмг выше порога
+            
             delay = np.nan
             if len(crossings) > 0:
                 onset_idx = crossings[0]
@@ -109,59 +124,50 @@ class DataProcessor(QObject):
 
                 self.delayValue.emit(int(delay))        # --> to show immediate feedback
 
+
                 print("DELAY {}".format(delay))
                 
             else:
                 print("NO PEAK HAS BEEN DETECTED")
 
             print("PONK COUNTER", self._ponk_count)
-            self._delays[self._ponk_count].append(delay)        # --> triplets
+            self._delays.append(delay)       # накапливает все задержки  
+            self._feedback_counter += 1  # для показа N-усреднённой обратной связи
             self._ponk_count += 1
             self._trigger = None 
 
-    
-    def _define_thr(self, x):
-        s = self.settings.detection_settings
-        if s.thr_adaptive:
-            baseline = x[:self._ms_to_sample(s.baseline_ms)]
-            threshold = np.mean(baseline) + s.n_sd * np.std(baseline)
-        else:
-            threshold = s.threshold * (10 ** self.settings.plot_settings.scale_factor)
-        return threshold
 
-    def activate_triplet_detection(self, status):
-        # False - триплет окончен, True - триплет начался. 
-        # print("TRIPLET HAS BEEN FINISHED?", not status)
-        self._detect_on = status
-        if not status:
-            self._ponk_count = 0         # новый отсчёт поньков
-            
-            print(self._delays)
-            # print(np.array(([np.array(delay) for delay in self._delays])))
-            delays = np.array(([np.array(delay).T for delay in self._delays])).T
-            # delays = np.array(self._delays).T     # для проведения манипуляций
-            print(delays)
-            
-            s = self.settings.stimuli_settings
-            if s.feedback_mode_curr == 0:   # после каждой попытки
-                print("--> SHOW", delays[-1])
-                self.delayTripletValues.emit(delays[-1])        # показать последнюю попытку
-            elif s.feedback_mode_curr == 1:     # накапливать n штук
-                self._triplets_counter += 1
-                if self._triplets_counter >= s.feedback_n:
-                    toshow = np.nanmean(delays[-s.feedback_n:], axis=0)
-                    print("--> SHOW", toshow)
-                    self.delayTripletValues.emit(toshow)        # показать среднее n попыток
-                    self._triplets_counter = 0
-            else:       # показывать если отклонение превышает заданные границы
-                d1 = delays[-1][0]
-                d2 = delays[-1][1]
-                d3 = delays[-1][2]
-                limits = s.delay_limit
-                if (abs(d1) > limits[0]) or (abs(d2) > limits[1]) or (abs(d3) > limits[2]):
-                    print("--> SHOW", delays[-1])
-                    self.delayTripletValues.emit(delays[-1])        # показать последнюю попытку
-    
+    def get_delays(self):
+        """
+        после окончания стимульного ряда
+        Signal: delayValues --> main_window --> stimuli_panel --> video_player
+        """
+
+        s = self.settings.stimuli_settings
+
+        stimuli = s.stimuli_curr
+        feedback = s.feedback_mode_curr
+        
+        # if feedback == 0 or 2 (and if delays are above limit in case of feedback == 2)
+        send_feedback = True
+        feedack_values = np.array(self._delays[-3:]) if stimuli == 0 else np.array([self._delays[-1]])      # three or one last delays
+
+        if feedback == 2: # показывать если отклонение превышает заданные границы
+            limits = s.delay_limit
+            send_feedback = any(value > limit for value, limit in zip(feedack_values, limits))  # False if all below limit
+
+        elif feedback == 1:  # показывать после накопления N значений усреднённую версию
+            send_feedback = self._feedback_counter >= s.feedback_n
+            if send_feedback:
+                n_ponk = 3 if stimuli == 0 else 1
+                delays = np.array(self._delays[-s.feedback_n*n_ponk:]).reshape((s.feedback_n, n_ponk)) 
+                feedack_values = np.nanmean(delays, axis=0)
+                self._feedback_counter = 0  # начать отсчёт сначала
+
+        if send_feedback:
+            self.logger.info(f"Delays: {feedack_values}.")
+            self.delayValues.emit(feedack_values) 
+
     
     # === signal parsing === 
     def _process_trigger(self, pack):
@@ -172,11 +178,12 @@ class DataProcessor(QObject):
         self.trigger.extend(trigger*1E-3)
 
         trigger_diff = np.diff(trigger)
-        event = np.where(trigger_diff == 1)[0]      # 0 -> 1
+        event = np.where(trigger_diff == -1)[0]      # 0 -> 1
         if len(event) != 0:
             idx =-(len(trigger) - event[0])
             self.triggerIdx.emit(idx)
             self._trigger = self.ts[idx]       # для обработки поньков  [ms]
+            # self.logger.info(f"Trigger event at {self._trigger} ms.")
             
     def _process_new_pack(self, pack):
         emg = pack[:, self.settings.emg_channels_bipolar].squeeze() 
