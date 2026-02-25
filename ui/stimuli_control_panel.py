@@ -5,7 +5,7 @@ from PyQt5.QtGui import QKeySequence
 import json
 import os
 
-from utils.ui_helpers import create_button, create_spin_box, create_check_box, create_combo_box, create_shortcut
+from utils.ui_helpers import create_button, create_spin_box, create_check_box, create_combo_box, create_shortcut, create_lineedit
 from utils.layout_utils import create_hbox, create_vbox
 
 from .video_player import StimuliPresentation_one_by_one
@@ -46,6 +46,8 @@ class StimuliControlPanel(QFrame):
         
         self._settings_panel = QFrame(self)
         
+        self.line_edit_filename = create_lineedit(parent=self)
+        self.line_edit_filename.setText(self.settings.filename)
         self.button_stimuli = create_button(text='Открыть стимулы', disabled=False, parent=self, w=100)
         self.button_stimuli_pause = create_button(text=PLAY_LABEL, disabled=True, parent=self)
 
@@ -84,6 +86,7 @@ class StimuliControlPanel(QFrame):
         layout_delay_limit3 = create_hbox([QLabel("поньк #3:", self), self.spin_box_limit3, QLabel("мс", self)])
         
         layout = QVBoxLayout(self)
+        layout.addWidget(self.line_edit_filename)
         layout.addLayout(layout_start)
         layout.addLayout(layout_stimuli)
         layout.addLayout(layout_monitor)

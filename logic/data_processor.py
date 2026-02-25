@@ -9,6 +9,9 @@ from settings.settings import Settings
 from utils.averaging_math import RollingMean, RollingMedian, RollingTrimMean
 
 import logging
+from datetime import datetime
+
+from utils.logging import ExperimentLogger
 
 class DataProcessor(QObject):
     """
@@ -35,7 +38,8 @@ class DataProcessor(QObject):
     def __init__(self, settings):
         super().__init__()
         self.settings = settings    # settings
-        self.logger = logging.getLogger(__name__)
+        # self.logger = logging.getLogger(__name__)
+        self.logger = ExperimentLogger(self.settings.stimuli_settings.filename)
 
         # для хранения данных
         time_range_ms = self.settings.plot_settings.time_range_ms
@@ -62,6 +66,9 @@ class DataProcessor(QObject):
         self.create_filters()
         self._detect_on = False
 
+    def change_file(self):
+        self.logger.close()
+        self.logger = ExperimentLogger(self.settings.stimuli_settings.filename)
 
     @pyqtSlot(object, float)
     def add_pack(self, pack, ts):
@@ -74,6 +81,7 @@ class DataProcessor(QObject):
         """
         # emg = np.diff(pack[:, self.settings.emg_channels_monopolar], axis=1).squeeze() 
         
+        self.res_timestamp = ts
         emg = self._process_new_pack(pack)
         self.emg.extend(emg)
 
@@ -121,15 +129,34 @@ class DataProcessor(QObject):
 
                 onset_time = self.ts[onset_idx+mask[0]] # момент времени
                 delay = onset_time - self._trigger
+                duration = len(crossings)
+
+                amp = np.max(x[crossings])
 
                 self.delayValue.emit(int(delay))        # --> to show immediate feedback
 
-
+                data = {
+                    'timestamp': datetime.now().isoformat(),
+                    'res_timestamp': self.res_timestamp, 
+                    'error': int(delay),
+                    'duration': int(duration), 
+                    'amplitude': amp
+                }
                 print("DELAY {}".format(delay))
                 
             else:
                 print("NO PEAK HAS BEEN DETECTED")
+                data = {
+                    'timestamp': datetime.now().isoformat(),
+                    'res_timestamp': self.res_timestamp, 
+                    'error': np.nan,
+                    'duration': np.nan, 
+                    'amplitude': np.nan
+                }
 
+            data["mode"] = "TKEO" if self.settings.processing_settings.tkeo else "EMG"
+            data['threshold'] = threshold
+            self.logger.log_trial(data)
             print("PONK COUNTER", self._ponk_count)
             self._delays.append(delay)       # накапливает все задержки  
             self._feedback_counter += 1  # для показа N-усреднённой обратной связи
@@ -144,10 +171,12 @@ class DataProcessor(QObject):
         """
 
         s = self.settings.stimuli_settings
-
+        
         stimuli = s.stimuli_curr
         feedback = s.feedback_mode_curr
         
+        if feedback == 3:
+            return
         # if feedback == 0 or 2 (and if delays are above limit in case of feedback == 2)
         send_feedback = True
         feedack_values = np.array(self._delays[-3:]) if stimuli == 0 else np.array([self._delays[-1]])      # three or one last delays
@@ -165,7 +194,7 @@ class DataProcessor(QObject):
                 self._feedback_counter = 0  # начать отсчёт сначала
 
         if send_feedback:
-            self.logger.info(f"Delays: {feedack_values}.")
+            # self.logger.info(f"Delays: {feedack_values}.")
             self.delayValues.emit(feedack_values) 
 
     

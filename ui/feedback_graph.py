@@ -13,23 +13,49 @@ ERROR_COLORS = {
     3: QColor(255, 165, 0),      # Оранжевый (сильное отклонение)
     4: QColor(255, 0, 0)         # Ярко-красный (критическое отклонение)
 }
+# ERROR_COLORS = {
+#     0: QColor(0, 255, 100),     # Ярко-зеленый с синим оттенком
+#     1: QColor(150, 255, 100),   # Светло-зеленый
+#     2: QColor(255, 255, 100),   # Желтый
+#     3: QColor(255, 180, 100),   # Оранжевый
+#     4: QColor(255, 100, 100)    # Розовато-красный
+# }
+
+# def get_text_color(value, max_error=350):
+#     # Нормализуем значение от 0 до 1
+#     ratio = min(abs(value) / max_error, 1.0)
+    
+#     # Определяем индекс цвета (0-4)
+#     if ratio == 0:
+#         color_index = 0
+#     elif ratio <= 0.25:
+#         color_index = 1
+#     elif ratio <= 0.5:
+#         color_index = 2
+#     elif ratio <= 0.75:
+#         color_index = 3
+#     else:
+#         color_index = 4
+#     return ERROR_COLORS[color_index]
+
+ERROR_COLORS_10 = {
+    0: QColor(0, 255, 0),        # #00FF00 - ярко-зеленый (идеально)
+    1: QColor(80, 255, 0),       # #50FF00 - зеленый с желтым оттенком
+    2: QColor(140, 255, 0),      # #8CFF00 - желто-зеленый
+    3: QColor(200, 255, 0),      # #C8FF00 - зеленовато-желтый
+    4: QColor(255, 255, 0),      # #FFFF00 - желтый
+    5: QColor(255, 200, 0),      # #FFC800 - желто-оранжевый
+    6: QColor(255, 140, 0),      # #FF8C00 - оранжевый
+    7: QColor(255, 80, 0),       # #FF5000 - красно-оранжевый
+    8: QColor(255, 40, 0),       # #FF2800 - оранжево-красный
+    9: QColor(255, 0, 0)         # #FF0000 - ярко-красный (критически)
+}
 
 def get_text_color(value, max_error=350):
-    # Нормализуем значение от 0 до 1
+    """Компактная версия с 10 цветами"""
     ratio = min(abs(value) / max_error, 1.0)
-    
-    # Определяем индекс цвета (0-4)
-    if ratio == 0:
-        color_index = 0
-    elif ratio <= 0.25:
-        color_index = 1
-    elif ratio <= 0.5:
-        color_index = 2
-    elif ratio <= 0.75:
-        color_index = 3
-    else:
-        color_index = 4
-    return ERROR_COLORS[color_index]
+    color_index = min(int(ratio * 10), 9)  # 0-9
+    return ERROR_COLORS_10[color_index]
 
 def get_error_color(value, max_error=350):
     """
@@ -37,14 +63,20 @@ def get_error_color(value, max_error=350):
     value: текущее значение ошибки
     max_error: максимальное значение ошибки (при котором цвет красный)
     """
-    # Нормализуем значение от 0 до 1
+
     ratio = min(abs(value) / max_error, 1.0)
     
     # RGB компоненты
     # Зеленый: (0, 255, 0) -> Красный: (255, 0, 0)
+    # red = int(255 * ratio)
+    # green = int(255 * (1 - ratio))
+    # blue = 0
+
+    # Добавляем синий компонент для яркости
     red = int(255 * ratio)
     green = int(255 * (1 - ratio))
-    blue = 0
+    blue = int(120 * (1 - ratio))  # синий делает зеленый ярче на сером
+
     
     return QColor(red, green, blue), QColor(red, green, blue, 100)
 
@@ -266,7 +298,7 @@ class FeedbackGraph(QWidget):
             QPointF(right_x, right_y)
         ])
         
-        painter.setBrush(QBrush(Qt.blue))
+        painter.setBrush(QBrush(QColor(52, 58, 64)))
         painter.drawPolygon(arrow_head)
     
     def draw_label(self, painter):
@@ -283,7 +315,7 @@ class FeedbackGraph(QWidget):
         label_y = axis_widget[1] - 20
         
         painter.drawText(label_x - 40, label_y, 
-                        f"{self.vertex_x:.1f}")
+                        f"{self.vertex_x}")
 
 
 class MainWindow(QMainWindow):

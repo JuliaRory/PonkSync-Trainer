@@ -18,12 +18,13 @@ class StimuliSettings:
     cross_ms: int = 2000
     show_feedback: int = 500
     feedback_ms: int = 3000
-    feedback_mode: List[str] = field(default_factory=lambda: ["После каждой попытки", "После N попыток", "При превышении"])
+    feedback_mode: List[str] = field(default_factory=lambda: ["После каждой попытки", "После N попыток", "При превышении", "Без обратной связи"])
     feedback_mode_curr: int = 0
     delay_limit: List[int] = field(default_factory=lambda: [50, 50, 50])
     feedback_n: int = 2
     feedback_w: int = 460
     feedback_h: int = 460
+    filename: str = r"00SS_triplets_NoFB.csv"
 
 
 @dataclass

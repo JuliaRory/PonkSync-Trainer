@@ -47,7 +47,7 @@ class StimuliPresentation_one_by_one(QWidget):
     def __init__(self, settings=None):
         super().__init__()  
 
-        self.logger = logging.getLogger(__name__)
+        # self.logger = logging.getLogger(__name__)
         self._volume = settings.volume
         self.settings = settings 
         self.show_delay = False
@@ -64,6 +64,7 @@ class StimuliPresentation_one_by_one(QWidget):
         self._is_paused = False             # и не на паузе
 
         self._counter = 0
+        self.n = None
         
         self._cross_figure_path = os.path.join(r"resources\stimuli", self.settings.cross_figure)
         
@@ -95,6 +96,8 @@ class StimuliPresentation_one_by_one(QWidget):
         # self.media.add_option(':start-time=1.56')
         self.media.parse_async()  # preload
 
+    def set_number(self, n=None):
+        self.n = n
 
     def _configure_player(self):
         # ===  VLC player === 
@@ -128,21 +131,20 @@ class StimuliPresentation_one_by_one(QWidget):
 
         # === Установить видос === 
         self.set_video_path()
-    
-    
+        
     def _setup_layout(self):
         self._stacked = QStackedWidget()      # позволяет просто переключаться между виджетами
 
         self._stacked.addWidget(self._video_widget)      # индекс 0
         self._stacked.addWidget(self._feedback_widget)   # индекс 1
-        self._stacked.addWidget(self._cross_widget)      # индекс 1
+        self._stacked.addWidget(self._cross_widget)      # индекс 2
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0,0,0,0)
 
         layout.addWidget(self._stacked)
 
-        self._stacked.setCurrentIndex(1)
+        self._stacked.setCurrentIndex(2)
 
     def _configure_background_label(self):
         background_path = os.path.join(r"resources\stimuli", self.settings.background_figure)
@@ -188,7 +190,7 @@ class StimuliPresentation_one_by_one(QWidget):
         # первый стимул
         self._current_index = 0
         self.currIdxChanged.emit(self._current_index)
-
+        
         print('[VLC player]: press Space to start.')
 
     def _configure_feedback_widget(self):
@@ -225,22 +227,28 @@ class StimuliPresentation_one_by_one(QWidget):
             self._feedback_graph.show()
         
         stimuli_mode = self.settings.stimuli[self.settings.stimuli_curr]
-        self.logger.info(f"Stimuli mode: {stimuli_mode}")
+        # self.logger.info(f"Stimuli mode: {stimuli_mode}")
     
     # ===============================
     # === цикл проигрывания видео ===
     # ===============================
 
     def _play_next_video(self):
-        if self._stopped:
+        if self._stopped or self._is_paused:
             print('[VLC player]: stimuli presentation has been stopped.')
             return
+        
 
+        self._counter += 1
+        if self.n is not None: 
+            if self._counter > self.n:
+                return 
+            
         self._stacked.setCurrentIndex(2)
 
         # self._cross_label.show()
-        
-        self.logger.info(f"show stimuli")
+
+        # self.logger.info(f"show stimuli")
 
         # запустить следующее видео
         self._player.set_media(self.media)
@@ -268,13 +276,14 @@ class StimuliPresentation_one_by_one(QWidget):
         if self._player.get_state() == vlc.State.Ended:     # Если видео закончилось
             # Сразу показываем placeholder перед следующим видео
             # self._cross_label.show()
-            # self._stacked.setCurrentIndex(2)
+            
 
             self.stimuliEnded.emit()    # --> stimuli_control_panel --> main_window --> data_processor
 
             if self.show_delay:
                 QTimer.singleShot(self._show_feedback_ms, self._check_feedback)
             else:
+                self._stacked.setCurrentIndex(2)
                 QTimer.singleShot(self._cross_dur_ms, self._play_next_video)
         else:
             QTimer.singleShot(50, self._check_video_end)
@@ -307,13 +316,18 @@ class StimuliPresentation_one_by_one(QWidget):
         # QTimer.singleShot(50, self._cross_label.hide)
 
         self.show_delay = False
-        QTimer.singleShot(self._feedback_ms, self._show_cross)
+        if not self._is_paused:
+            QTimer.singleShot(self._feedback_ms, self._show_cross)
+        else:
+            QTimer.singleShot(250, self._check_feedback)
 
     
     def _show_cross(self):
         self._stacked.setCurrentIndex(2)
-        QTimer.singleShot(self._cross_dur_ms, self._play_next_video)
-        
+        if not self._is_paused:
+            QTimer.singleShot(self._cross_dur_ms, self._play_next_video)
+        else:
+            QTimer.singleShot(250, self._show_cross)
 
     # =======================
     # ===     события     ===
@@ -327,8 +341,7 @@ class StimuliPresentation_one_by_one(QWidget):
                     
         elif event.key() == Qt.Key_R:           # restart
             self.restart_sequence()             
-
-                                                # volume regulation
+                                                 # volume regulation
 
         elif event.key() == Qt.Key_Up:                  # -- volume up
             new_value = min(100, self._volume + 1)

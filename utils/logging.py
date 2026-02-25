@@ -3,6 +3,72 @@ import sys
 import os
 from datetime import datetime
 
+import csv
+from collections import deque
+
+
+class ExperimentLogger:
+    """
+    Логгер специально для вашего эксперимента с треугольниками
+    """
+    def __init__(self, filename="experiment_data.csv"):
+        self.filename = filename
+        
+        # Поля для вашего эксперимента
+        self.fieldnames = [
+            'timestamp',           # время
+            'res_timestamp',       # время резонанса
+            'trial_number',        # номер попытки
+            'error',               # ошибка попадания в стимул 
+            'duration',            # длительность сокращения
+            'amplitude',           # амплитуда
+            'mode',                # EMG or TKEO
+            'threshold'            # порог
+        ]
+        
+        # Создаем файл
+        filename = os.path.join(r"data/tests", filename)
+        file_exists = os.path.isfile(filename)
+        self.file = open(filename, 'a', newline='', encoding='utf-8')
+        self.writer = csv.DictWriter(self.file, fieldnames=self.fieldnames)
+        
+        if not file_exists:
+            self.writer.writeheader()
+            self.file.flush()
+        
+        self.trial_number = 0
+        
+    def log_trial(self, data):
+        """
+        Запись одной попытки
+        """
+        self.trial_number += 1
+        data["trial_number"] = self.trial_number
+        self.writer.writerow(data)
+        self.file.flush()
+        # print(f"Попытка {self.trial_counter} записана")
+    
+    def log_event(self, event_type, **kwargs):
+        """
+        Запись произвольного события
+        """
+        data = {
+            'timestamp': datetime.now().isoformat(),
+            'trial_number': self.trial_counter,
+            'event_type': event_type,
+            **kwargs
+        }
+        
+        # Добавляем только те поля, что есть в fieldnames
+        filtered_data = {k: v for k, v in data.items() if k in self.fieldnames}
+        
+        self.writer.writerow(filtered_data)
+        self.file.flush()
+    
+    def close(self):
+        self.file.close()
+
+
 class ImmediateFileHandler(logging.FileHandler):
     """Кастомный handler с немедленной записью на диск"""
     def emit(self, record):

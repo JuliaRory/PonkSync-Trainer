@@ -46,6 +46,7 @@ class SettingsHandler:
         self._scale_panel.spin_box_min_value.valueChanged[int].connect(self._update_ymin)
         self._scale_panel.spin_box_scale_offset.valueChanged[int].connect(self._update_offset)
         self._scale_panel.spin_box_time_range.valueChanged[int].connect(self._update_timerange)
+        self._scale_panel.combobox_signal_type.currentIndexChanged[int].connect(self._update_tkeo)
 
         self._filter_panel.spin_box_lower_freq.valueChanged[int].connect(self._update_low_freq)
         self._filter_panel.spin_box_upper_freq.valueChanged[int].connect(self._update_high_freq)
@@ -66,6 +67,7 @@ class SettingsHandler:
         self._stimuli_panel.spin_box_limit1.valueChanged[int].connect(self._update_limit1)
         self._stimuli_panel.spin_box_limit2.valueChanged[int].connect(self._update_limit2)
         self._stimuli_panel.spin_box_limit3.valueChanged[int].connect(self._update_limit3)
+        self._stimuli_panel.line_edit_filename.textChanged.connect(self._update_filename)
 
 
     # === plot settings === 
@@ -123,8 +125,15 @@ class SettingsHandler:
         text = f"<span style='font-size: 14pt;'>&times; 10<sup>{factor}</sup></span>"
         self._peak_panel.label_units.setText(text)
     
+    def _update_tkeo(self, index):
+        status = True if index == 1 else False
+        self.settings.processing_settings.tkeo = status
 
     # === stimuli settings === 
+    def _update_filename(self, filename):
+        self.settings.stimuli_settings.filename = filename
+        self.data_processor.change_file()
+
     def _update_stimuli(self, index):
         self.settings.stimuli_settings.stimuli_curr = index
         pw = getattr(self.ui._stimuli_panel, "_player_window", None)

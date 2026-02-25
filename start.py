@@ -16,10 +16,10 @@ from utils.logging import setup_logging
 if __name__ == "__main__":
     # os.environ['QT_QPA_PLATFORM_PLUGIN_PATH'] = r'.\venv\Lib\site-packages\PyQt5\Qt5\plugins'
     # os.environ['PATH'] += r';~qgis directoryqt\apps\qgis\bin;~qgis directory\apps\Qt5\bin'
-    logger = setup_logging(log_dir="logs")
-    logging.info("=" * 50)
-    logging.info("ЗАПУСК ПРИЛОЖЕНИЯ")
-    logging.info("=" * 50)
+    # logger = setup_logging(log_dir="logs")
+    # logging.info("=" * 50)
+    # logging.info("ЗАПУСК ПРИЛОЖЕНИЯ")
+    # logging.info("=" * 50)
 
     # == Создание главный объект приложения Qt == 
     app = QApplication(sys.argv)    
