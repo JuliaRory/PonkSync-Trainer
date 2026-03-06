@@ -84,8 +84,10 @@ class OnlineGraph(QFrame):
         self.figure.addItem(line)
     
     def update_thr_line(self, thr):
+        print(thr)
         if self.thr_line is not None:
             self.figure.removeItem(self.thr_line)
+        
         self.thr_line = pg.InfiniteLine(pos=thr, angle=0, pen="brown")
         self.figure.addItem(self.thr_line)
     

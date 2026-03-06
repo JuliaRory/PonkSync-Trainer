@@ -277,7 +277,6 @@ class StimuliPresentation_one_by_one(QWidget):
             # Сразу показываем placeholder перед следующим видео
             # self._cross_label.show()
             
-
             self.stimuliEnded.emit()    # --> stimuli_control_panel --> main_window --> data_processor
 
             if self.show_delay:

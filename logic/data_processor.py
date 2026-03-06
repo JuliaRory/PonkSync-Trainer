@@ -83,7 +83,7 @@ class DataProcessor(QObject):
         
         self.res_timestamp = ts
         emg = self._process_new_pack(pack)
-        self.emg.extend(emg)
+        self.emg.extend(emg* 1E3)
 
         self.ts.extend(np.arange(self.timestamp, self.timestamp + emg.shape[0], 1) * self._coef)        # ms
         self.timestamp += emg.shape[0]  # idx
@@ -180,10 +180,11 @@ class DataProcessor(QObject):
         # if feedback == 0 or 2 (and if delays are above limit in case of feedback == 2)
         send_feedback = True
         feedack_values = np.array(self._delays[-3:]) if stimuli == 0 else np.array([self._delays[-1]])      # three or one last delays
-
+        
         if feedback == 2: # показывать если отклонение превышает заданные границы
             limits = s.delay_limit
-            send_feedback = any(value > limit for value, limit in zip(feedack_values, limits))  # False if all below limit
+            send_feedback = any(abs(value) > limit for value, limit in zip(feedack_values, limits))  # False if all below limit
+            print(send_feedback, [value > limit for value, limit in zip(feedack_values, limits)])
 
         elif feedback == 1:  # показывать после накопления N значений усреднённую версию
             send_feedback = self._feedback_counter >= s.feedback_n
@@ -207,7 +208,7 @@ class DataProcessor(QObject):
         self.trigger.extend(trigger*1E-3)
 
         trigger_diff = np.diff(trigger)
-        event = np.where(trigger_diff == -1)[0]      # 0 -> 1
+        event = np.where(trigger_diff == 1)[0]      # 0 -> 1
         if len(event) != 0:
             idx =-(len(trigger) - event[0])
             self.triggerIdx.emit(idx)
@@ -215,7 +216,8 @@ class DataProcessor(QObject):
             # self.logger.info(f"Trigger event at {self._trigger} ms.")
             
     def _process_new_pack(self, pack):
-        emg = pack[:, self.settings.emg_channels_bipolar].squeeze() 
+        emg = pack[:, self.settings.emg_channels_monopolar] 
+        emg = np.diff(emg, axis=1).squeeze()
         s = self.settings.processing_settings
         if s.do_notch:
             emg = self.apply_notch(emg)
