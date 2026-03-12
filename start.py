@@ -10,7 +10,7 @@ from utils.dispatcher import CallDispatcher
 from drivers.resonance_foreign_driver import Driver
 from ui.main_window import MainWindow
 
-import logging
+# import logging
 from utils.logging import setup_logging 
 
 if __name__ == "__main__":

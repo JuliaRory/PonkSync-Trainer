@@ -11,7 +11,7 @@ from utils.averaging_math import RollingMean, RollingMedian, RollingTrimMean
 import logging
 from datetime import datetime
 
-from utils.logging import ExperimentLogger
+# from utils.logging import ExperimentLogger
 
 class DataProcessor(QObject):
     """
