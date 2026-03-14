@@ -216,8 +216,13 @@ class DataProcessor(QObject):
             # self.logger.info(f"Trigger event at {self._trigger} ms.")
             
     def _process_new_pack(self, pack):
-        emg = pack[:, self.settings.emg_channels_monopolar] 
-        emg = np.diff(emg, axis=1).squeeze()
+        # monopolar
+        # emg = pack[:, self.settings.emg_channels_monopolar] 
+        # emg = np.diff(emg, axis=1).squeeze()
+
+        # bipolar
+        emg = pack[:, self.settings.emg_channels_bipolar].squeeze()
+
         s = self.settings.processing_settings
         if s.do_notch:
             emg = self.apply_notch(emg)

@@ -4,12 +4,12 @@ from typing import List
 @dataclass
 class StimuliSettings:
     volume: int = 80
-    monitor: int = 3
+    monitor: int = 2
     record: bool = False
-    cross_figure: str = "cross_image_white_photomark.png"
-    background_figure: str = "background_white_photomark.png"
-    triplet_video: str = "animatedTriplet_750_trig2_-200ms_astim.mkv"
-    single_video: str = "animatedSingle_1500_trig2_0ms.mkv"
+    cross_figure: str = "cross_image_white_photomark_left.png"
+    background_figure: str = "background_white_photomark_left.png"
+    triplet_video: str = "PS__animatedTriplet_750_L.mkv"
+    single_video: str = "PS__animatedSingle_750_L.mkv"
     SRT_video: str = "PS__SRT.mkv" 
     stimuli: List[str] = field(default_factory=lambda: ["Триплеты", "Одиночные", "SRT"])
     stimuli_curr: int = 0
@@ -54,7 +54,7 @@ class ProcessingSettings:
 
 @dataclass
 class DetectionSettings:
-    bit: int = 1
+    bit: int = 0
     window_ms:  List[int] = field(default_factory=lambda: [-375, 375])
     threshold: int = 4
     threshold_mv: float = 0.5
@@ -67,9 +67,9 @@ class DetectionSettings:
 class Settings:
     data_source: str = "nvx136"  # "SPEED"
     emg_channels_monopolar: List[int] = field(default_factory=lambda: [64, 65])
-    emg_channels_bipolar: List[int] = field(default_factory=lambda: [64])
+    emg_channels_bipolar: List[int] = field(default_factory=lambda: [1])
 
-    Fs: int = 5000  # Hz
+    Fs: int = 1000  # Hz
     
     detection_settings: DetectionSettings = field(default_factory=DetectionSettings)
     plot_settings: PlotSettings = field(default_factory=PlotSettings)

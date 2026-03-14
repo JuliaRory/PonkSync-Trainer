@@ -1,6 +1,7 @@
 *.hdf
 data/
 venv/
-/.conda
+.conda/
 __pycache__/
 *.pyc
+.vscode/
