@@ -38,7 +38,7 @@ if __name__ == "__main__":
 
     # driver.loadConfig(r'streamDataSimulator__to__PonkSync.json')       # вгрузить настройки с потоком в резонансе
     
-    driver.loadConfig(r'stream_nvx136__to__PonkSync-Trainer.json')       # вгрузить настройки с потоком в резонансе
+    driver.loadConfig(r'stream_nvx136__to__PonkSync-Trainer_msu.json')       # вгрузить настройки с потоком в резонансе
 
     # == Запуск приложения ==
 

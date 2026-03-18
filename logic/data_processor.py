@@ -110,6 +110,7 @@ class DataProcessor(QObject):
         """
         s = self.settings.detection_settings
         window = s.window_ms
+        mov_criterio = s.mov_detect_criterio #"max" or "onset"
         
         if self.ts[-1] >= self._trigger+window[1]: # если накопилось достаточно сэмплов
             # self.logger.info(f"Trigger processed at {self.ts[-1]} ms.")
@@ -125,9 +126,12 @@ class DataProcessor(QObject):
             delay = np.nan
             if len(crossings) > 0:
                 onset_idx = crossings[0]
-                self.peakIdx.emit(onset_idx+mask[0])    # --> plot_updater
+                # max_value_idx = np.argmax(x)[0]
 
-                onset_time = self.ts[onset_idx+mask[0]] # момент времени
+                idx = onset_idx # max_value_idx if mov_criterio == "max" else 
+                self.peakIdx.emit(idx+mask[0])    # --> plot_updater
+
+                onset_time = self.ts[idx+mask[0]] # момент времени
                 delay = onset_time - self._trigger
                 duration = len(crossings)
 
@@ -159,7 +163,7 @@ class DataProcessor(QObject):
             self.logger.log_trial(data)
             print("PONK COUNTER", self._ponk_count)
             self._delays.append(delay)       # накапливает все задержки  
-            self._feedback_counter += 1  # для показа N-усреднённой обратной связи
+            self._feedback_counter += 1      # для показа N-усреднённой обратной связи
             self._ponk_count += 1
             self._trigger = None 
 
@@ -175,8 +179,12 @@ class DataProcessor(QObject):
         stimuli = s.stimuli_curr
         feedback = s.feedback_mode_curr
         
-        if feedback == 3:
+        if feedback == 3:   # если режим без ОС
             return
+        
+        if len(self._delays) == 0: 
+            print("NO DELAYS")
+            return 
         # if feedback == 0 or 2 (and if delays are above limit in case of feedback == 2)
         send_feedback = True
         feedack_values = np.array(self._delays[-3:]) if stimuli == 0 else np.array([self._delays[-1]])      # three or one last delays
@@ -205,15 +213,16 @@ class DataProcessor(QObject):
         ttl = np.array(pack[:, -1], dtype=np.uint8)
         bit = self.settings.detection_settings.bit
         trigger = ((ttl>>bit) & 0b1).astype(int)
+            
         self.trigger.extend(trigger*1E-3)
 
         trigger_diff = np.diff(trigger)
-        event = np.where(trigger_diff == 1)[0]      # 0 -> 1
+        event = np.where(trigger_diff == 1)[0]      # 0 -> 1 
         if len(event) != 0:
+            print("EVENT", bit, event)
             idx =-(len(trigger) - event[0])
             self.triggerIdx.emit(idx)
             self._trigger = self.ts[idx]       # для обработки поньков  [ms]
-            # self.logger.info(f"Trigger event at {self._trigger} ms.")
             
     def _process_new_pack(self, pack):
         # monopolar
