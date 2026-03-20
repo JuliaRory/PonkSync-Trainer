@@ -39,7 +39,7 @@ class DataProcessor(QObject):
         super().__init__()
         self.settings = settings    # settings
         # self.logger = logging.getLogger(__name__)
-        self.logger = ExperimentLogger(self.settings.stimuli_settings.filename)
+        # self.logger = ExperimentLogger(self.settings.stimuli_settings.filename)
 
         # для хранения данных
         time_range_ms = self.settings.plot_settings.time_range_ms
@@ -66,9 +66,9 @@ class DataProcessor(QObject):
         self.create_filters()
         self._detect_on = False
 
-    def change_file(self):
-        self.logger.close()
-        self.logger = ExperimentLogger(self.settings.stimuli_settings.filename)
+    # def change_file(self):
+        # self.logger.close()
+        # self.logger = ExperimentLogger(self.settings.stimuli_settings.filename)
 
     @pyqtSlot(object, float)
     def add_pack(self, pack, ts):
