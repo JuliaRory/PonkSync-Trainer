@@ -1,6 +1,7 @@
 import logging
 import sys
 import os
+import json
 from datetime import datetime
 
 import csv
@@ -27,7 +28,7 @@ class ExperimentLogger:
         ]
         
         # Создаем файл
-        filename = os.path.join(r"data/tests", filename)
+        # filename = os.path.join(r"data/tests", filename)
         file_exists = os.path.isfile(filename)
         self.file = open(filename, 'a', newline='', encoding='utf-8')
         self.writer = csv.DictWriter(self.file, fieldnames=self.fieldnames)
@@ -37,7 +38,10 @@ class ExperimentLogger:
             self.file.flush()
         
         self.trial_number = 0
-        
+    
+    def set_output_stream(self, output_stream):
+        self.output_stream = output_stream
+
     def log_trial(self, data):
         """
         Запись одной попытки
@@ -64,6 +68,8 @@ class ExperimentLogger:
         
         self.writer.writerow(filtered_data)
         self.file.flush()
+        print(filtered_data)
+        self.output_stream(json.dums(filtered_data))
     
     def close(self):
         self.file.close()

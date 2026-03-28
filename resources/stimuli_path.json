@@ -1,0 +1,35 @@
+{   
+    "cross_figure":
+        {
+            "right": "cross_image_white_photomark.png",
+            "left": "cross_image_white_photomark_left.png"
+        },
+    "background":
+        {
+            "right": "background_white_photomark.png",
+            "left": "background_white_photomark_left.png"
+        },
+    "triplets":
+        {
+            "all_sounds": "animatedTriplet_tms3_0ms_allsounds.mkv",
+            "left": "PS__animatedTriplet_750_L.mkv"
+        },
+    "single":
+        {
+            "circle": 
+                {
+                    "60":   "animatedSingle1500_tms_0ms_nosounds.mkv",
+                    "120":  "animatedSingle1500_tms_0ms_nosounds_120fps.mkv"
+                },
+            "bar": 
+                {
+                    "60":   "animatedSingle1500_tms_0ms_nosounds_bar.mkv",
+                    "120":  "animatedSingle1500_tms_0ms_nosounds_bar_120fps.mkv"
+                },
+            "vbar":
+                {
+                    "60":   "animatedSingle1500_tms_0ms_nosounds_vbar.mkv",
+                    "120":  "animatedSingle1500_tms_0ms_nosounds_vbar_120fps.mkv"
+                }
+        }
+}

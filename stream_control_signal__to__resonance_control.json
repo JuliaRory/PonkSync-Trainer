@@ -1,0 +1,57 @@
+[
+	{
+		"attributes": null,
+		"enabled": true,
+		"group": "default",
+		"index": 20,
+		"label": "service name",
+		"name": "service name",
+		"serialized": "signalGenerator",
+		"type": "Resonance::Parameters::String"
+	},
+	{
+		"attributes": {
+			"activeStream": {
+				"connections": [],
+				"metaData": {}
+			},
+			"reconnect": false
+		},
+		"enabled": true,
+		"group": "default",
+		"index": 10,
+		"label": "controlSignal",
+		"name": "controlSignal",
+		"serialized": {
+			"desiredStream": {
+				"connections": [
+					"discover:///?stream=controlSignal&name=PonkSync-Trainer"
+				],
+				"metaData": {},
+				"name": "controlSignal",
+				"serializedType": "DgA="
+			}
+		},
+		"type": "Resonance::Parameters::Stream"
+	},
+	{
+		"attributes": null,
+		"enabled": true,
+		"group": "default",
+		"index": 40,
+		"label": "rec_filename",
+		"name": "rec_filename",
+		"serialized": "D:\\Resonance\\TEP_visualization\\data\\records\\rec-$$$.h5",
+		"type": "Resonance::Parameters::String"
+	},
+	{
+		"attributes": null,
+		"enabled": true,
+		"group": "default",
+		"index": 30,
+		"label": "stream_name",
+		"name": "stream_name",
+		"serialized": "generated",
+		"type": "Resonance::Parameters::String"
+	}
+]

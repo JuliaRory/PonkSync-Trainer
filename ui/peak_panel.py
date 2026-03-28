@@ -32,10 +32,12 @@ class PeakDetectionPanel(QFrame):
         self.spin_box_window_from = create_spin_box(-2000, 0, s.window_ms[0], parent=self)
         self.spin_box_window_until = create_spin_box(0, 2000, s.window_ms[1], parent=self)
 
-        self.spin_box_threshold_mv = create_spin_box(0, 100, s.threshold_mv, step=0.01, data_type="float", parent=self)
-        self.spin_box_threshold_curr = create_spin_box(0, 100000, s.threshold, parent=self)
+        self.spin_box_threshold_mv = create_spin_box(0, 100, s.threshold_mv, step=0.01, data_type="float")
+        self.spin_box_threshold_curr = create_spin_box(0, 100000, s.threshold, data_type="float", step=0.25)
 
         self.label_units = QLabel("...")
+
+        self.spin_box_bit = create_spin_box(0, 8, s.bit, parent=self)
         # self.spin_box_min_value = create_spin_box(-100, 100, s.ymin, parent=self)
         # self.spin_box_scale_offset = create_spin_box(-100, 100, s.scale_offset, parent=self)
         # self.spin_box_time_range = create_spin_box(1, 20, int(s.time_range_ms//1000), parent=self)
@@ -47,7 +49,9 @@ class PeakDetectionPanel(QFrame):
         layout = QVBoxLayout(self)
         layout.addLayout(create_hbox([QLabel("Окно детекции")]))
         layout.addLayout(create_hbox([QLabel("от"), self.spin_box_window_from, QLabel("до"), self.spin_box_window_until, QLabel("мс")]))
-        layout.addLayout(create_hbox([QLabel("Порог"), self.spin_box_threshold_curr, self.label_units, QLabel("<==>"), self.spin_box_threshold_mv, QLabel("мВ")]))
+        layout.addLayout(create_hbox([QLabel("Порог"), self.spin_box_threshold_curr, self.label_units]))
+
+        layout.addLayout(create_hbox([QLabel("Бит"), self.spin_box_bit]))
 
         # layout.addLayout(create_hbox([QLabel("Time range:"), self.spin_box_time_range, QLabel("s")]))
         # layout.addLayout(create_hbox([QLabel("Signal:"), self.combobox_signal_type]))
