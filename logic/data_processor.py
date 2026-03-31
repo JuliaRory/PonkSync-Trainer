@@ -35,11 +35,14 @@ class DataProcessor(QObject):
     delayValue = pyqtSignal(int)
     delayValues = pyqtSignal(object)    # --> main_window --> stimuli_panel --> video_player
  
-    def __init__(self, settings):
+    def __init__(self, settings, output_stream_ponk):
         super().__init__()
         self.settings = settings    # settings
         # self.logger = logging.getLogger(__name__)
-        # self.logger = ExperimentLogger(self.settings.stimuli_settings.filename)
+        self.logger = ExperimentLogger(self.settings.stimuli_settings.filename)
+        self.logger.set_output_stream(output_stream_ponk)
+
+        self.output_stream_ponk = output_stream_ponk
 
         # для хранения данных
         time_range_ms = self.settings.plot_settings.time_range_ms
@@ -66,9 +69,11 @@ class DataProcessor(QObject):
         self.create_filters()
         self._detect_on = False
 
-    # def change_file(self):
-        # self.logger.close()
-        # self.logger = ExperimentLogger(self.settings.stimuli_settings.filename)
+    def change_file(self, filename):
+        # filename : full path
+        self.logger.close()
+        self.logger = ExperimentLogger(filename)
+        self.logger.set_output_stream(self.output_stream_ponk)
 
     @pyqtSlot(object, float)
     def add_pack(self, pack, ts):
@@ -176,7 +181,7 @@ class DataProcessor(QObject):
 
         s = self.settings.stimuli_settings
         
-        stimuli = s.stimuli_curr
+        stimuli = s.stimuli_curr # 0 - single, 1 - single SST, 2 - triplets, 3 - triplets SS
         feedback = s.feedback_mode_curr
         
         if feedback == 3:   # если режим без ОС
@@ -185,9 +190,10 @@ class DataProcessor(QObject):
         if len(self._delays) == 0: 
             print("NO DELAYS")
             return 
+        
         # if feedback == 0 or 2 (and if delays are above limit in case of feedback == 2)
         send_feedback = True
-        feedack_values = np.array(self._delays[-3:]) if stimuli == 0 else np.array([self._delays[-1]])      # three or one last delays
+        feedack_values = np.array(self._delays[-3:]) if stimuli == 2 else np.array([self._delays[-1]])      # three or one last delays
         
         if feedback == 2: # показывать если отклонение превышает заданные границы
             limits = s.delay_limit
@@ -225,14 +231,16 @@ class DataProcessor(QObject):
             self._trigger = self.ts[idx]       # для обработки поньков  [ms]
             
     def _process_new_pack(self, pack):
-        # monopolar
-        # emg = pack[:, self.settings.emg_channels_monopolar] 
-        # emg = np.diff(emg, axis=1).squeeze()
-
-        # bipolar
-        emg = pack[:, self.settings.emg_channels_bipolar].squeeze()
-
         s = self.settings.processing_settings
+
+        # montage
+        if s.montage == 1:  # monopolar
+            emg = pack[:, s.emg_channels_monopolar].squeeze()
+        else:   # bipolar
+            emg = pack[:, s.emg_channels_bipolar] 
+            emg = np.diff(emg, axis=1).squeeze()
+
+        
         if s.do_notch:
             emg = self.apply_notch(emg)
         if s.do_lowpass or s.do_highpass:

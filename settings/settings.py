@@ -4,7 +4,7 @@ from typing import List
 @dataclass
 class StimuliSettings:
     volume: int = 80
-    monitor: int = 3
+    monitor: int = 2
     record: bool = False
     cross_figure: str = "cross_image_white_photomark.png"
     background_figure: str = "background_white_photomark.png"
@@ -14,8 +14,15 @@ class StimuliSettings:
     single_video: str = "animatedSingle1500_tms_0ms_nosounds.mkv"
     SRT_video: str = "PS__SRT.mkv" 
     SST_video: str = "animatedSingle1500_stop-200ms_tms_0ms_nosounds.mkv"
-    stimuli: List[str] = field(default_factory=lambda: ["Триплеты", "Одиночные", "SRT", "SST"])
-    stimuli_curr: int = 1
+    
+    stimuli: List[str] = field(default_factory=lambda: ["Одиночные", "Одиночные SST", "Триплеты", "Триплеты SST"])
+    stimuli_type: List[str] = field(default_factory=lambda: ["Круг", "Вертикальный бар", "Горизонтальный бар"])
+    fps: List[str] = field(default_factory=lambda: ['60', '120'])
+    
+    stimuli_curr: int = 0
+    stimuli_type_curr: int = 0
+    fps_curr: int = 0
+
     stimuli_n: int = 10
     stimuli_inf: bool = True
     cross_ms: int = 2000
@@ -27,13 +34,15 @@ class StimuliSettings:
     feedback_n: int = 2
     feedback_w: int = 460
     feedback_h: int = 460
-    filename: str = r"test.csv"
+
+    subject: str = r"00SS"
+    filename: str = r"test"
 
 
 @dataclass
 class PlotSettings:
     ymax: int = 10
-    ymin: int = -10
+    ymin: int = 0
     scale_offset: int = 0
     scale_factor: int = -10
     time_range_ms: int = 4000  # ms    
@@ -54,6 +63,12 @@ class ProcessingSettings:
     
     tkeo: bool = True
     extra_samples: int = 500
+    montage_list: List[str] = field(default_factory=lambda: ["bipolar", "monopolar"])
+    montage: str = 0
+    emg_channels_bipolar: List[int] = field(default_factory=lambda: [64, 65])
+    emg_channels_monopolar: int = 0
+
+    freq: int = 5000 # Hz
 
 @dataclass
 class DetectionSettings:
@@ -67,11 +82,11 @@ class DetectionSettings:
     mov_detect_criterio: str = "max"
 
 
+
 @dataclass
 class Settings:
     data_source: str = "nvx136"  # "SPEED"
-    emg_channels_monopolar: List[int] = field(default_factory=lambda: [64, 65])
-    emg_channels_bipolar: List[int] = field(default_factory=lambda: [0])
+    
 
     Fs: int = 5000  # Hz
     
@@ -79,3 +94,7 @@ class Settings:
     plot_settings: PlotSettings = field(default_factory=PlotSettings)
     processing_settings: ProcessingSettings = field(default_factory=ProcessingSettings)
     stimuli_settings: StimuliSettings = field(default_factory=StimuliSettings)
+
+    activate_bat: bool = True
+    bat_file: str = "D:\Resonance\dist_2025\control.bat"
+    bat_file_home: str = "C:/Users/hodor/Documents/lab-MSU/Works/2025.10_TMS/dist_2024_11_13_imp/control.bat"

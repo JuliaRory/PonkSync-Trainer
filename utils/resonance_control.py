@@ -40,6 +40,7 @@ class ServiceProxy:
         # stream должен иметь метод send(), который шлёт JSON в QML
         self._stream(json.dumps(message))
         print(f"[Proxy] Sent to {self.name}: command={command}")
+        print(message)
     
     def checkState(self):
         self._stream(json.dumps({"service": self.name, "type": "check"}))

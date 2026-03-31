@@ -25,7 +25,7 @@ DSM.StateMachine {
 	
 	signal startedEeg
 
-    Recorder { // WHAT IS IT??? another qml??..
+    Recorder { 
         id: recorder
     }
 
@@ -69,6 +69,9 @@ DSM.StateMachine {
 
                     let service = ResonanceApp.getService("TEP_visual");
                     if (service) {recorder.addStream('discover:///?stream=stimuli&name=TEP_visual', 'stimuli');}
+
+                    let service = ResonanceApp.getService("PonkSync_Trainer");
+                    if (service) {recorder.addStream('discover:///?stream=ponk_data&name=PonkSync_Trainer', 'ponk_data');}
 
                     //recorder.addStream('discover:///?stream=eeg&name=nvx136', 'eeg')
 

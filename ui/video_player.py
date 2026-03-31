@@ -3,6 +3,7 @@ import sys, os
 import vlc
 import time
 import numpy as np
+import json
 
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel, QStackedWidget
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer
@@ -83,14 +84,61 @@ class StimuliPresentation_one_by_one(QWidget):
 
     def set_video_path(self):
         stimuli = self.settings.stimuli_curr
-        if stimuli == 0:
-            video = self.settings.triplet_video
-        elif stimuli == 1:
-            video = self.settings.single_video
-        elif stimuli == 2:
-            video = self.settings.SRT_video
+        stimuli_type = self.settings.stimuli_type_curr
+        fps = self.settings.fps_curr
 
-        self._video_path = os.path.join(r"resources\stimuli", video)
+        # Загружаем данные
+        with open(r'resources/stimuli_path.json', 'r') as f:
+            data = json.load(f)
+
+        def get_selected_path(data, combo1_value, combo2_value, combo3_value=None):
+            key = {
+                "Одиночные": "single",
+                "Одиночные SST": "single_SST",
+                "Триплеты": "triplets",
+                "Триплеты SST": "triplets_SST",
+                "Круг": "circle",
+                "Вертикальный бар": "vbar",
+                "Горизонтальный бар": "bar",
+            }
+            combo1_value = key[combo1_value]
+            combo2_value = key[combo2_value]
+            if combo1_value == "single":
+                return data["single"][combo2_value][combo3_value]
+            elif combo1_value == "triplets":
+                return data["triplets"][combo2_value]
+            return None
+
+        path = get_selected_path(data, 
+                                 self.settings.stimuli[stimuli],
+                                 self.settings.stimuli_type[stimuli_type],
+                                 self.settings.fps[fps])
+        print(path)
+        # if stimuli == 0: # single
+        #     if stimuli_type == 0: # circle
+        #         elif stimuli == 1: # single SST
+        
+        #         elif stimuli == 2: # triplets
+            
+        #     elif stimuli_type == 1: # bar
+            
+        #     elif stimuli_type == 2: # vbar
+
+        # elif stimuli == 1: # single SST
+        
+        # elif stimuli == 2: # triplets
+
+        # elif stimuli == 3: # triplest SST
+
+
+        # if stimuli == 0:
+        #     video = self.settings.triplet_video
+        # elif stimuli == 1:
+        #     video = self.settings.single_video
+        # elif stimuli == 2:
+        #     video = self.settings.SRT_video
+
+        self._video_path = os.path.join(r"resources\stimuli", path)
         # === Подготовка последовательности ===
         self.media = self._instance.media_new(self._video_path)
         # self.media.add_option(':start-time=1.56')
@@ -217,11 +265,11 @@ class StimuliPresentation_one_by_one(QWidget):
         self._show_feedback_ms = self.settings.show_feedback 
     
     def change_stimuli(self):
-        if self.settings.stimuli_curr == 0:
+        if self.settings.stimuli_curr == 2:
             self._feedback_graph.hide()
             for graph in self._feedback_graphs:
                 graph.show()
-        else:
+        elif self.settings.stimuli_curr == 0:
             for graph in self._feedback_graphs:
                 graph.hide()
             self._feedback_graph.show()
@@ -301,14 +349,14 @@ class StimuliPresentation_one_by_one(QWidget):
         self._stacked.setCurrentIndex(1)        # switch to feedback widget
 
         print("TO SHOW", self.delay_value)
-        if self.settings.stimuli_curr == 0:
+        if self.settings.stimuli_curr == 2: # triplets
             d1 = int(self.delay_value[0]) if np.isfinite(self.delay_value[0]) else np.nan
             d2 = int(self.delay_value[1]) if np.isfinite(self.delay_value[1]) else np.nan
             d3 = int(self.delay_value[2]) if np.isfinite(self.delay_value[2]) else np.nan
             for i, d in enumerate([d1, d2, d3]):
                 graph = self._feedback_graphs[i]
                 self._update_feedback_graph(graph, d)
-        else:
+        elif self.settings.stimuli_curr == 0:   # single
             d = int(self.delay_value[0]) if np.isfinite(self.delay_value[0]) else np.nan
             self._update_feedback_graph(self._feedback_graph, d)
 

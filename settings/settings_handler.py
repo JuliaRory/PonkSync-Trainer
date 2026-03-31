@@ -47,6 +47,10 @@ class SettingsHandler:
         self._scale_panel.spin_box_scale_offset.valueChanged[int].connect(self._update_offset)
         self._scale_panel.spin_box_time_range.valueChanged[int].connect(self._update_timerange)
         self._scale_panel.combobox_signal_type.currentIndexChanged[int].connect(self._update_tkeo)
+        self._scale_panel.combobox_montage.currentIndexChanged[int].connect(self._update_montage)
+        self._scale_panel.spin_box_monopolar.valueChanged[int].connect(self._update_monopolar_montage)
+        self._scale_panel.spin_box_bipolar_1.valueChanged[int].connect(self._update_bipolar_1_montage)
+        self._scale_panel.spin_box_bipolar_2.valueChanged[int].connect(self._update_bipolar_2_montage)
 
         self._filter_panel.spin_box_lower_freq.valueChanged[int].connect(self._update_low_freq)
         self._filter_panel.spin_box_upper_freq.valueChanged[int].connect(self._update_high_freq)
@@ -54,10 +58,15 @@ class SettingsHandler:
         self._filter_panel.check_box_lowpass.stateChanged.connect(self._update_lowpass)
         self._filter_panel.check_box_highpass.stateChanged.connect(self._update_highpass)
 
-        self._peak_panel.spin_box_threshold_curr.valueChanged[int].connect(self._update_threshold)
+        self._peak_panel.spin_box_threshold_curr.valueChanged[float].connect(self._update_threshold)
         self._peak_panel.spin_box_threshold_mv.valueChanged[float].connect(self._update_threshold_mv)
+        self._peak_panel.spin_box_bit.valueChanged[int].connect(self._update_bit)
+
 
         self._stimuli_panel.combo_box_stimuli.currentIndexChanged[int].connect(self._update_stimuli)
+        self._stimuli_panel.combo_box_stimuli_type.currentIndexChanged[int].connect(self._update_stimuli_type)
+        self._stimuli_panel.combo_box_fps.currentIndexChanged[int].connect(self._update_fps)
+        
         self._stimuli_panel.spin_box_stimuli_n.valueChanged[int].connect(self._update_stimuli_n)
         self._stimuli_panel.check_box_stimuli_inf.stateChanged.connect(self._update_stimuli_inf)
         self._stimuli_panel.spin_box_monitor.valueChanged[int].connect(self._update_monitor)
@@ -71,6 +80,18 @@ class SettingsHandler:
 
 
     # === plot settings === 
+    # == montage ==
+    def _update_montage(self, idx):
+        self.settings.processing_settings.montage = idx
+    
+    def _update_monopolar_montage(self, channel):
+        self.settings.processing_settings.emg_channels_monopolar = channel
+    
+    def _update_bipolar_1_montage(self, channel):
+        self.settings.processing_settings.emg_channels_bipolar[0] = channel
+    
+    def _update_bipolar_2_montage(self, channel):
+        self.settings.processing_settings.emg_channels_bipolar[1] = channel
 
     def _update_threshold(self, thr):
         print("tkeo", thr)
@@ -80,6 +101,9 @@ class SettingsHandler:
         # self._peak_panel.spin_box_threshold_mv.setValue(mv)
         # self.settings.detection_settings.threshold_mv = mv
         self._update_thr()
+
+    def _update_bit(self, bit):
+        self.settings.detection_settings.bit = bit
 
     def _update_threshold_mv(self, thr):
         print("mv", thr)
@@ -132,7 +156,6 @@ class SettingsHandler:
     # === stimuli settings === 
     def _update_filename(self, filename):
         self.settings.stimuli_settings.filename = filename
-        self.data_processor.change_file()
 
     def _update_stimuli(self, index):
         self.settings.stimuli_settings.stimuli_curr = index
@@ -141,8 +164,21 @@ class SettingsHandler:
             self.ui._stimuli_panel._player_window.set_video_path()
             self.ui._stimuli_panel._player_window.change_stimuli()
     
+    def _update_stimuli_type(self, index):
+        self.settings.stimuli_settings.stimuli_type_curr = index
+        pw = getattr(self.ui._stimuli_panel, "_player_window", None)
+        if isinstance(pw, QWidget) and not pw.isHidden():
+            self.ui._stimuli_panel._player_window.set_video_path()
+            self.ui._stimuli_panel._player_window.change_stimuli()
+
+    def _update_fps(self, index):
+        self.settings.stimuli_settings.fps_curr = index
+        pw = getattr(self.ui._stimuli_panel, "_player_window", None)
+        if isinstance(pw, QWidget) and not pw.isHidden():
+            self.ui._stimuli_panel._player_window.set_video_path()
+            self.ui._stimuli_panel._player_window.change_stimuli()
     
-    def _update_stimuli_n(self, n): # DOESNOT INPLEMENTED AT ALL
+    def _update_stimuli_n(self, n): # DOES NOT INPLEMENTED AT ALL
         self.settings.stimuli_settings.stimuli_n = n
     
     def _update_stimuli_inf(self, status):

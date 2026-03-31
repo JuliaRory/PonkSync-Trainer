@@ -3,13 +3,12 @@ from PyQt5.QtCore import Qt, QTimer, QObject, QThread, pyqtSignal
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QMainWindow, QWidget, QGridLayout, QPushButton, QLabel, QSpinBox, QDoubleSpinBox, QCheckBox, QVBoxLayout, QHBoxLayout
 
-import time, random
-from h5py import File
 from numpy import diff, arange, array, full, sum, tile, newaxis, vstack, linspace, pi, sin
 
 
 from collections import deque
-import copy
+import os
+import subprocess
 
 from settings.settings import Settings 
 from settings.settings_handler import SettingsHandler
@@ -24,20 +23,28 @@ from ui.filter_panel import FilterPanel
 from ui.peak_panel import PeakDetectionPanel
 from ui.stimuli_control_panel import StimuliControlPanel
 
-
-WIDTH_SET, HEIGHT_SET = 1200, 800
+WIDTH_SET, HEIGHT_SET = 1400, 800
 
 class MainWindow(QWidget):
-    def __init__(self, input_data_stream, input_message_stream):
+    def __init__(self, input_data_stream, input_message_stream, output_stream_ponk, resonance):
         super().__init__()
         self.setWindowTitle("SyncPonk Trainer")
         # self.setWindowIcon(QIcon(r"./resources/icon.png"))
 
-        # self._resonance = resonance                       # прокси для управления резонансными модулями
+        self._resonance = resonance                       # прокси для управления резонансными модулями
         self.settings = Settings()                        # Хранилище настроек
 
         self._input_stream = StreamSource(input_data_stream, input_message_stream)                              # Приёмник (онлайн) данных
-        self._data_processor = DataProcessor(self.settings)              
+        self._data_processor = DataProcessor(self.settings, output_stream_ponk)
+
+        if self.settings.activate_bat:
+            # Запуск батника с qml-файлом для управления резонансными модулями
+            try:
+                cwd = os.path.dirname(self.settings.bat_file) # cwd = папка с батником
+                subprocess.Popen([self.settings.bat_file], cwd=cwd)
+            except:
+                cwd = os.path.dirname(self.settings.bat_file_home) # cwd = папка с батником
+                subprocess.Popen([self.settings.bat_file_home], cwd=cwd)             
         
         self._setup_widgets()
         self._setup_layout()
@@ -62,7 +69,7 @@ class MainWindow(QWidget):
         self._filter_panel = FilterPanel(self.settings, parent=self)
         self._peak_panel = PeakDetectionPanel(self.settings, parent=self)
         self._figure_panel = OnlineGraph(self.settings, self._data_processor, parent=self)       # создать блок с графиками миограммы            --> self.plot_emg_graph
-        self._stimuli_panel = StimuliControlPanel(self.settings, parent=self)
+        self._stimuli_panel = StimuliControlPanel(self.settings, self._resonance, parent=self)
     
     ## =======================
     ## === LAYOUT ===========
@@ -76,8 +83,9 @@ class MainWindow(QWidget):
         
         layout.addWidget(self._figure_panel, 0, 1, 4, 3)
         
-        layout.addWidget(self._peak_panel, 0, 4, 1, 1, alignment=Qt.AlignLeft)
-        layout.addWidget(self._stimuli_panel, 1, 4, 1, 1, alignment=Qt.AlignLeft)
+        layout.addWidget(self._peak_panel, 0, 4, 1, 2, alignment=Qt.AlignLeft)
+        layout.addWidget(self._stimuli_panel, 1, 4, 1, 2, alignment=Qt.AlignLeft)
+
         
     ## =======================
     ## === CONNECTIONS =======
@@ -92,7 +100,8 @@ class MainWindow(QWidget):
 
         # self._data_processor.delayValue[int].connect(lambda delay: self._process_delay(delay))
         self._stimuli_panel.stimuliEnded.connect(lambda: self._data_processor.get_delays())
-        
+        self._stimuli_panel.changeFile.connect(lambda fl: self._data_processor.change_file(fl))
+   
         self._data_processor.delayValues.connect(lambda delays: self._process_delays(delays))
 
     # logic
@@ -156,3 +165,11 @@ class MainWindow(QWidget):
         for i, plot in enumerate(self.plots):
             plot.setTitle(titles[i])
     
+    def closeEvent(self, event):
+        # self._settings_handler.save_to_json(default=True)
+        # self._settings_handler_record.save_to_json(default=True)
+        
+        if self.settings.activate_bat:
+            service = self._resonance.getService("Resonance-control")     # Берем сервис
+            service.sendTransition('!terminate')
+        event.accept()
