@@ -25,7 +25,7 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)    
 
     # == Магическое подключениен драйвера для получения потока с данными из резонанса ==                                                                                        
-    driver = Driver("PonkSync-Trainer")
+    driver = Driver("PonkSync-Trainer")                                   
 
     dispatcher_data = CallDispatcher()                                         # пустая функция-обработчик
     driver.inputDataStream("data", dispatcher_data)                             # создание входного потока данных типа Stream
