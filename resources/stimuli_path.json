@@ -23,8 +23,8 @@
                 },
             "bar": 
                 {
-                    "60":   "animatedSingle1500_tms_0ms_nosounds_bar.mkv",
-                    "120":  "animatedSingle1500_tms_0ms_nosounds_bar_120fps.mkv"
+                    "60":   "animatedSingle1500_tms_-200ms_nosounds_bar_continue.mkv",
+                    "120":  "animatedSingle1500_tms_0ms_nosounds_bar.mkv"
                 },
             "vbar":
                 {
