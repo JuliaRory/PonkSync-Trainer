@@ -72,6 +72,7 @@ class SettingsHandler:
         self._stimuli_panel.spin_box_monitor.valueChanged[int].connect(self._update_monitor)
         self._stimuli_panel.check_box_stimuli_record.stateChanged.connect(self._update_record_status)
         self._stimuli_panel.combo_box_feedback_mode.currentIndexChanged[int].connect(self._update_feedback_mode)
+        self._stimuli_panel.combo_box_feedback_form.currentIndexChanged[int].connect(self._update_feedback_form)
         self._stimuli_panel.spin_box_feedback_n.valueChanged[int].connect(self._update_feedback_n)
         self._stimuli_panel.spin_box_limit1.valueChanged[int].connect(self._update_limit1)
         self._stimuli_panel.spin_box_limit2.valueChanged[int].connect(self._update_limit2)
@@ -180,9 +181,15 @@ class SettingsHandler:
     
     def _update_stimuli_n(self, n): # DOES NOT INPLEMENTED AT ALL
         self.settings.stimuli_settings.stimuli_n = n
+        pw = getattr(self.ui._stimuli_panel, "_player_window", None)
+        if isinstance(pw, QWidget) and not pw.isHidden():
+            self.ui._stimuli_panel._player_window.apply_sequence_settings()
     
     def _update_stimuli_inf(self, status):
-        self.settings.stimuli_settings.stimuli_inf = status
+        self.settings.stimuli_settings.stimuli_inf = bool(status)
+        pw = getattr(self.ui._stimuli_panel, "_player_window", None)
+        if isinstance(pw, QWidget) and not pw.isHidden():
+            self.ui._stimuli_panel._player_window.apply_sequence_settings()
     
     def _update_monitor(self, n):
         self.settings.stimuli_settings.monitor = n
@@ -197,6 +204,9 @@ class SettingsHandler:
     def _update_feedback_mode(self, index):
         self.settings.stimuli_settings.feedback_mode_curr = index
         # --> signal to change feedback mode in video_player
+
+    def _update_feedback_form(self, index):
+        self.settings.stimuli_settings.feedback_form_curr = index
     
     def _update_feedback_n(self, n):
         self.settings.stimuli_settings.feedback_n = n

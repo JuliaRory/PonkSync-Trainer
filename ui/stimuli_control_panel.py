@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QFrame, QVBoxLayout, QHBoxLayout, QLabel, QWidget, QSizePolicy, QShortcut
+from PyQt5.QtWidgets import QFrame, QVBoxLayout, QHBoxLayout, QLabel, QWidget, QSizePolicy, QShortcut, QMessageBox
 from PyQt5.QtCore import  pyqtSignal, Qt
 from PyQt5.QtGui import QKeySequence
 
@@ -8,6 +8,7 @@ import os
 from utils.ui_helpers import create_button, create_spin_box, create_check_box, create_combo_box, create_shortcut, create_lineedit
 from utils.layout_utils import create_hbox, create_vbox
 
+from .results_window import ResultsWindow
 from .video_player import StimuliPresentation_one_by_one
 
 PLAY_LABEL = "▶"
@@ -41,6 +42,7 @@ class StimuliControlPanel(QFrame):
     def _init_state(self):
         self._restart_stimuli = False
         self._player_window = None
+        self._results_windows = []
 
     # =======================
     # =====     UI      =====
@@ -56,6 +58,8 @@ class StimuliControlPanel(QFrame):
         self.line_edit_filename.setText(self.settings.filename)
         self.button_stimuli = create_button(text='Открыть стимулы', disabled=False, parent=self, w=100)
         self.button_stimuli_pause = create_button(text=PLAY_LABEL, disabled=True, parent=self)
+        self.button_stimuli_restart = create_button(text='start again', disabled=True, parent=self)
+        self.button_show_results = create_button(text='show results', disabled=False, parent=self)
 
         self.combo_box_stimuli = create_combo_box(self.settings.stimuli, curr_item_idx=self.settings.stimuli_curr, parent=self)
         self.combo_box_stimuli_type = create_combo_box(self.settings.stimuli_type, curr_item_idx=self.settings.stimuli_type_curr, parent=self)
@@ -69,6 +73,7 @@ class StimuliControlPanel(QFrame):
         self.check_box_stimuli_record = create_check_box(self.settings.record, 'Запись NVX', parent=self)
 
         self.combo_box_feedback_mode = create_combo_box(self.settings.feedback_mode, curr_item_idx=self.settings.feedback_mode_curr, parent=self)
+        self.combo_box_feedback_form = create_combo_box(self.settings.feedback_form, curr_item_idx=self.settings.feedback_form_curr, parent=self)
         self.spin_box_feedback_n = create_spin_box(0, 30, self.settings.feedback_n, parent=self)
         delay_limit = self.settings.delay_limit
         self.spin_box_limit1 = create_spin_box(0, 1000, delay_limit[0], parent=self)
@@ -85,18 +90,20 @@ class StimuliControlPanel(QFrame):
         
         layout_filename = create_hbox([QLabel("Subject:", self), self.line_edit_subject, QLabel("Record:", self), self.line_edit_filename])
         layout_start = create_hbox([self.button_stimuli, self.button_stimuli_pause, self.check_box_stimuli_record])
-        layout_stimuli = create_hbox([self.combo_box_stimuli, QLabel("fps:"), self.combo_box_fps])
+        layout_stimuli = create_hbox([self.combo_box_stimuli, QLabel("fps:"), self.combo_box_fps, self.button_stimuli_restart])
         layout_stimuli_type = create_hbox([QLabel("Тип стимулов:"), self.combo_box_stimuli_type])
         
         layout_number = create_hbox([QLabel("монитор", self), self.spin_box_monitor, QLabel("N:", self), self.spin_box_stimuli_n, QLabel("или", self), self.check_box_stimuli_inf])
 
         layout_feedback_mode = create_hbox([QLabel("Режим ОС", self), self.combo_box_feedback_mode])
+        layout_feedback_form = create_hbox([QLabel("Форма ОС", self), self.combo_box_feedback_form])
         layout_feedback_n = create_hbox([QLabel("N эпох", self), self.spin_box_feedback_n])
         layout_delay_limit1 = create_hbox([QLabel("поньк #1:", self), self.spin_box_limit1, QLabel("мс", self)])
         layout_delay_limit2 = create_hbox([QLabel("поньк #2:", self), self.spin_box_limit2, QLabel("мс", self)])
         layout_delay_limit3 = create_hbox([QLabel("поньк #3:", self), self.spin_box_limit3, QLabel("мс", self)])
         
         layout = QVBoxLayout(self)
+        layout.addWidget(self.button_show_results)
         layout.addLayout(layout_filename)
         layout.addLayout(layout_start)
         layout.addLayout(layout_stimuli)
@@ -105,6 +112,7 @@ class StimuliControlPanel(QFrame):
         
         layout.addWidget(self.label_stimuli_idx)
         layout.addLayout(layout_feedback_mode)
+        layout.addLayout(layout_feedback_form)
         layout.addLayout(layout_feedback_n)
         layout.addLayout(layout_delay_limit1)
         layout.addLayout(layout_delay_limit2)
@@ -118,6 +126,8 @@ class StimuliControlPanel(QFrame):
     def _setup_connections(self):
         self.button_stimuli.clicked.connect(self._on_stimuli_button_click)                      # Открыть окно для показа стимулов
         self.button_stimuli_pause.clicked.connect(self._on_pause_stimuli_button_click)
+        self.button_stimuli_restart.clicked.connect(self._on_restart_stimuli_presentation)
+        self.button_show_results.clicked.connect(self._on_show_results)
 
     
     def _update_connections(self):
@@ -149,6 +159,7 @@ class StimuliControlPanel(QFrame):
         else:
             if not self._restart_stimuli:   # если первый запуск окна с показом стимулов -> создаём окно
                 self._player_window = StimuliPresentation_one_by_one(self.settings)
+                self._player_window.apply_sequence_settings()
                 self._player_window.show()
                 self._player_window.raise_()
 
@@ -156,6 +167,7 @@ class StimuliControlPanel(QFrame):
 
             self.button_stimuli_pause.setEnabled(True)                  # кнопка пауза доступна
             self.button_stimuli_pause.setText(PLAY_LABEL)
+            self.button_stimuli_restart.setEnabled(True)
             self.button_stimuli.setText("Закрыть окно")                 # меняем надпись на кнопке "старт"
 
             self._restart_stimuli = False                           
@@ -168,6 +180,12 @@ class StimuliControlPanel(QFrame):
     
     def _stop_nvx(self):
         self._service.sendTransition('stop')
+
+    def _stop_recording_if_needed(self):
+        if self.check_box_stimuli_record.isChecked():
+            self.stimuliPresentation.emit(False)
+            self._stop_nvx()
+        self.check_box_stimuli_record.setEnabled(True)
 
     # == show delay === 
     def show_delay(self, delay):
@@ -185,21 +203,77 @@ class StimuliControlPanel(QFrame):
             self._change_button_pause_stimuli_text()
        
     def _on_restart_stimuli_presentation(self):
-        self._restart_stimuli = True
-        self._on_stimuli_button_click()
+        pw = getattr(self, "_player_window", None)
+        if isinstance(pw, QWidget) and not pw.isHidden():
+            self._stop_recording_if_needed()
+            self._player_window.restart_sequence()
+            self.button_stimuli_pause.setText(PLAY_LABEL)
 
     def _on_finish_stimuli(self):
         # запись nvx136
-        if self.check_box_stimuli_record.isChecked():
-            self.stimuliPresentation.emit(False)
-            self._stop_nvx()
+        self._stop_recording_if_needed()
 
         self.check_box_stimuli_record.setEnabled(True) # разрешить возможность поменять статус записи nvx
 
         self.label_stimuli_idx.setText(f"")
         self.button_stimuli_pause.setText(PLAY_LABEL)
+        self.button_stimuli_restart.setEnabled(False)
 
-    
+
+    def _find_results_csv_path(self):
+        subject = self.line_edit_subject.text().strip()
+        record_name = self.line_edit_filename.text().strip()
+        folder = os.path.abspath(os.path.join("data", subject))
+        exact_path = os.path.join(folder, f"{record_name}.csv")
+
+        if os.path.exists(exact_path):
+            return exact_path
+
+        if not os.path.isdir(folder):
+            return None
+
+        prefix = f"{record_name}-"
+        matches = [
+            os.path.join(folder, filename)
+            for filename in os.listdir(folder)
+            if filename.endswith(".csv") and (filename == f"{record_name}.csv" or filename.startswith(prefix))
+        ]
+        if not matches:
+            return None
+        return max(matches, key=os.path.getmtime)
+
+    def _get_results_limits(self):
+        if not self.settings.delay_limit:
+            return None
+        limit = max(abs(value) for value in self.settings.delay_limit)
+        return (-limit, limit)
+
+    def _on_show_results(self):
+        csv_path = self._find_results_csv_path()
+        if csv_path is None:
+            QMessageBox.warning(
+                self,
+                "Results Not Found",
+                "Could not find the CSV results file for the selected subject and record name.",
+            )
+            return
+
+        results_window = ResultsWindow()
+        self._results_windows.append(results_window)
+        results_window.destroyed.connect(
+            lambda _=None, window=results_window: self._results_windows.remove(window) if window in self._results_windows else None
+        )
+
+        results_window.show_results(
+            csv_path=csv_path,
+            subject=self.line_edit_subject.text().strip(),
+            record_name=self.line_edit_filename.text().strip(),
+            limits=self._get_results_limits(),
+        )
+        results_window.show()
+        results_window.raise_()
+        results_window.activateWindow()
+
     def _on_start_stimuli(self):
         folder = os.path.join(r"data", self.line_edit_subject.text())
         os.makedirs(folder, exist_ok=True)

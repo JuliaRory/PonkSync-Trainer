@@ -20,20 +20,25 @@ class StimuliSettings:
     fps: List[str] = field(default_factory=lambda: ['60', '120'])
     
     stimuli_curr: int = 0
-    stimuli_type_curr: int = 0
-    fps_curr: int = 0
+    stimuli_type_curr: int = 2
+    fps_curr: int = 1
 
     stimuli_n: int = 10
     stimuli_inf: bool = True
     cross_ms: int = 2000
-    show_feedback: int = 500
-    feedback_ms: int = 3000
+    show_feedback: int = 1000
+    feedback_ms: int = 1500
     feedback_mode: List[str] = field(default_factory=lambda: ["После каждой попытки", "После N попыток", "При превышении", "Без обратной связи"])
     feedback_mode_curr: int = 0
+    feedback_form: List[str] = field(default_factory=lambda: ["Plot", "On the bar"])
+    feedback_form_curr: int = 0
     delay_limit: List[int] = field(default_factory=lambda: [50, 50, 50])
     feedback_n: int = 2
     feedback_w: int = 460
     feedback_h: int = 460
+    feedback_bar_height_px: int = 150
+    feedback_bar_scale_px: int = 610
+    feedback_bar_scale_ms: int = 1500
 
     subject: str = r"00SS"
     filename: str = r"test"
@@ -96,5 +101,5 @@ class Settings:
     stimuli_settings: StimuliSettings = field(default_factory=StimuliSettings)
 
     activate_bat: bool = True
-    bat_file: str = "D:\Resonance\dist_2025\control.bat"
+    bat_file: str = "D:\Resonance\dist_2025\control_ponk.bat"
     bat_file_home: str = "C:/Users/hodor/Documents/lab-MSU/Works/2025.10_TMS/dist_2024_11_13_imp/control.bat"

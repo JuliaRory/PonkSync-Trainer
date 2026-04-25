@@ -225,10 +225,11 @@ class DataProcessor(QObject):
         trigger_diff = np.diff(trigger)
         event = np.where(trigger_diff == 1)[0]      # 0 -> 1 
         if len(event) != 0:
-            print("EVENT", bit, event)
-            idx =-(len(trigger) - event[0])
+            print("EVENT SOUND", bit, event)
+            idx =-(len(trigger) - event[0]-1)
             self.triggerIdx.emit(idx)
             self._trigger = self.ts[idx]       # для обработки поньков  [ms]
+        
             
     def _process_new_pack(self, pack):
         s = self.settings.processing_settings

@@ -1,4 +1,5 @@
 import sys, os
+import tempfile
 
 import vlc
 import time
@@ -10,6 +11,7 @@ from PyQt5.QtCore import Qt, pyqtSignal, QTimer
 from PyQt5.QtGui import QPixmap
 
 from ui.feedback_graph import FeedbackGraph
+from ui.feedback_bar_overlay import FeedbackBarOverlay
 import logging
 
 # воспроизведение стимулов идёт через VLC плеер (https://www.videolan.org/vlc/) <-- он должен быть установлен на компьютер (!!!) 
@@ -44,6 +46,7 @@ class StimuliPresentation_one_by_one(QWidget):
     stimuliEnded = pyqtSignal()       # --> stimuli_control_panel --> main_window --> data_processor
 
     stimulus = pyqtSignal(str)
+    BAR_FEEDBACK_MS = 2000
     
     def __init__(self, settings=None):
         super().__init__()  
@@ -66,8 +69,14 @@ class StimuliPresentation_one_by_one(QWidget):
 
         self._counter = 0
         self.n = None
+        self.apply_sequence_settings()
+        self._awaiting_first_frame = False
         
         self._cross_figure_path = os.path.join(r"resources\stimuli", self.settings.cross_figure)
+        self._feedback_snapshot_path = os.path.join(
+            tempfile.gettempdir(),
+            f"ponksync_feedback_snapshot_{id(self)}.png",
+        )
         
         # final_fig_files = os.listdir(r"resources\final_fig")
         # self.final_pic_path = os.path.join(r"resources\final_fig", random.choice(final_fig_files))
@@ -145,7 +154,24 @@ class StimuliPresentation_one_by_one(QWidget):
         self.media.parse_async()  # preload
 
     def set_number(self, n=None):
-        self.n = n
+        self.n = None if n is None else max(0, int(n))
+
+    def apply_sequence_settings(self):
+        if self.settings.stimuli_inf:
+            self.set_number(None)
+        else:
+            self.set_number(self.settings.stimuli_n)
+
+    def _finish_sequence(self):
+        self._player.stop()
+        self._awaiting_first_frame = False
+        self._is_paused = False
+        self._sequence_started = False
+        self.show_delay = False
+        self._finished = True
+        self._stacked.setCurrentIndex(2)
+        self._cross_label.show()
+        self.stimuliFinished.emit()
 
     def _configure_player(self):
         # ===  VLC player === 
@@ -161,6 +187,7 @@ class StimuliPresentation_one_by_one(QWidget):
         # Привязка событий
         events = self._player.event_manager()
         events.event_attach(vlc.EventType.MediaPlayerEndReached, self._on_end_reached)
+        events.event_attach(vlc.EventType.MediaPlayerPlaying, self._on_media_playing)
 
         # === background === 
         self._configure_background_label()
@@ -209,6 +236,16 @@ class StimuliPresentation_one_by_one(QWidget):
     def _configure_video_widget(self):
         self._video_widget = QWidget(self)
         self._video_widget.setStyleSheet("background-color: black;")
+        video_placeholder_pixmap = QPixmap(self._cross_figure_path).scaled(
+                self.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation
+            )
+        self._video_placeholder = QLabel(self._video_widget)
+        self._video_placeholder.setPixmap(video_placeholder_pixmap)
+        self._video_placeholder.setGeometry(self._video_widget.rect())
+        self._video_placeholder.setAlignment(Qt.AlignCenter)
+        self._video_placeholder.setStyleSheet("background:transparent;")
+        self._video_placeholder.show()
+        self._video_placeholder.raise_()
         # layout = QVBoxLayout(self)
         # layout.setContentsMargins(0,0,0,0)
         # layout.addWidget(self._video_widget)
@@ -243,6 +280,11 @@ class StimuliPresentation_one_by_one(QWidget):
 
     def _configure_feedback_widget(self):
         self._feedback_widget = QWidget(self)
+        self._feedback_bar_background = QLabel(self._feedback_widget)
+        self._feedback_bar_background.setGeometry(self._feedback_widget.rect())
+        self._feedback_bar_background.setAlignment(Qt.AlignCenter)
+        self._feedback_bar_background.setStyleSheet("background-color: black;")
+        self._feedback_bar_background.hide()
 
         w, h = self.settings.feedback_w, self.settings.feedback_h
 
@@ -257,6 +299,10 @@ class StimuliPresentation_one_by_one(QWidget):
         w, h = int(1.1 * w), int(1.1 * h)
         self._feedback_graph = FeedbackGraph(w, h, self._feedback_widget)
         self._feedback_graph.move(center_x, center_y)
+
+        self._feedback_bar_overlay = FeedbackBarOverlay(self.settings, self._feedback_widget)
+        self._feedback_bar_overlay.setGeometry(self._feedback_widget.rect())
+        self._feedback_bar_overlay.raise_()
 
         self.change_stimuli()
         # self._feedback_graph.setGeometry(x, y, width, height)
@@ -276,6 +322,19 @@ class StimuliPresentation_one_by_one(QWidget):
         
         stimuli_mode = self.settings.stimuli[self.settings.stimuli_curr]
         # self.logger.info(f"Stimuli mode: {stimuli_mode}")
+
+    def _show_feedback_plot_mode(self):
+        self._feedback_bar_background.hide()
+        self._feedback_bar_overlay.clear()
+        self.change_stimuli()
+
+    def _show_feedback_bar_mode(self):
+        self._feedback_graph.hide()
+        for graph in self._feedback_graphs:
+            graph.hide()
+        self._feedback_bar_background.show()
+        self._feedback_bar_background.raise_()
+        self._feedback_bar_overlay.raise_()
     
     # ===============================
     # === цикл проигрывания видео ===
@@ -286,13 +345,15 @@ class StimuliPresentation_one_by_one(QWidget):
             print('[VLC player]: stimuli presentation has been stopped.')
             return
         
+        self._hide_feedback_bar_mode()
+
+        if self.n is not None and self._counter >= self.n:
+            self._finish_sequence()
+            return
 
         self._counter += 1
-        if self.n is not None: 
-            if self._counter > self.n:
-                return 
             
-        self._stacked.setCurrentIndex(2)
+        self._stacked.setCurrentIndex(0)
 
         # self._cross_label.show()
 
@@ -302,8 +363,12 @@ class StimuliPresentation_one_by_one(QWidget):
         self._player.set_media(self.media)
         self._player.audio_set_volume(self._volume)
 
+        self._video_placeholder.show()
+        self._video_placeholder.raise_()
+        self._awaiting_first_frame = True
         self._player.play()
         self._stacked.setCurrentIndex(0)
+        QTimer.singleShot(250, self._hide_video_placeholder_fallback)
 
         # подготовить следующее видео
         self._current_index += 1
@@ -317,7 +382,18 @@ class StimuliPresentation_one_by_one(QWidget):
 
         # Проверяем окончание видео каждые 50ms
         QTimer.singleShot(50, self._check_video_end)
-    
+
+    def _show_video_widget(self):
+        if self._stopped:
+            return
+        if hasattr(self, "_video_placeholder"):
+            self._video_placeholder.hide()
+        self._awaiting_first_frame = False
+
+    def _hide_video_placeholder_fallback(self):
+        if self._awaiting_first_frame:
+            self._show_video_widget()
+
     def _check_video_end(self):
         if self._stopped:
             return  # больше ничего не делаем
@@ -328,10 +404,13 @@ class StimuliPresentation_one_by_one(QWidget):
             self.stimuliEnded.emit()    # --> stimuli_control_panel --> main_window --> data_processor
 
             if self.show_delay:
-                QTimer.singleShot(self._show_feedback_ms, self._check_feedback)
+                if self.settings.feedback_form_curr == 1:
+                    self._prepare_feedback_bar_background()
+                    QTimer.singleShot(0, self._check_feedback)
+                else:
+                    QTimer.singleShot(self._show_feedback_ms, self._check_feedback)
             else:
-                self._stacked.setCurrentIndex(2)
-                QTimer.singleShot(self._cross_dur_ms, self._play_next_video)
+                self._show_cross()
         else:
             QTimer.singleShot(50, self._check_video_end)
 
@@ -345,32 +424,46 @@ class StimuliPresentation_one_by_one(QWidget):
         graph.show_measure_line = status
         graph.show_label = status
 
-    def _check_feedback(self):
-        self._stacked.setCurrentIndex(1)        # switch to feedback widget
+    def _hide_feedback_bar_mode(self):
+        self._feedback_bar_background.hide()
+        self._feedback_bar_overlay.clear()
 
+    def _check_feedback(self):
         print("TO SHOW", self.delay_value)
-        if self.settings.stimuli_curr == 2: # triplets
-            d1 = int(self.delay_value[0]) if np.isfinite(self.delay_value[0]) else np.nan
-            d2 = int(self.delay_value[1]) if np.isfinite(self.delay_value[1]) else np.nan
-            d3 = int(self.delay_value[2]) if np.isfinite(self.delay_value[2]) else np.nan
-            for i, d in enumerate([d1, d2, d3]):
-                graph = self._feedback_graphs[i]
-                self._update_feedback_graph(graph, d)
-        elif self.settings.stimuli_curr == 0:   # single
-            d = int(self.delay_value[0]) if np.isfinite(self.delay_value[0]) else np.nan
-            self._update_feedback_graph(self._feedback_graph, d)
+        if self.settings.feedback_form_curr == 0:
+            self._show_feedback_plot_mode()
+            self._stacked.setCurrentIndex(1)        # switch to feedback widget
+
+            if self.settings.stimuli_curr == 2: # triplets
+                d1 = int(self.delay_value[0]) if np.isfinite(self.delay_value[0]) else np.nan
+                d2 = int(self.delay_value[1]) if np.isfinite(self.delay_value[1]) else np.nan
+                d3 = int(self.delay_value[2]) if np.isfinite(self.delay_value[2]) else np.nan
+                for i, d in enumerate([d1, d2, d3]):
+                    graph = self._feedback_graphs[i]
+                    self._update_feedback_graph(graph, d)
+            else:
+                d = int(self.delay_value[0]) if np.isfinite(self.delay_value[0]) else np.nan
+                self._update_feedback_graph(self._feedback_graph, d)
+        else:
+            self._stacked.setCurrentIndex(1)
+            self._show_feedback_bar_mode()
+            self._feedback_bar_overlay.set_values(self.delay_value)
 
         # QTimer.singleShot(50, self._cross_label.hide)
 
         self.show_delay = False
+        feedback_duration_ms = self.BAR_FEEDBACK_MS if self.settings.feedback_form_curr == 1 else self._feedback_ms
         if not self._is_paused:
-            QTimer.singleShot(self._feedback_ms, self._show_cross)
+            QTimer.singleShot(feedback_duration_ms, self._show_cross)
         else:
             QTimer.singleShot(250, self._check_feedback)
 
     
     def _show_cross(self):
-        self._stacked.setCurrentIndex(2)
+        self._hide_feedback_bar_mode()
+        self._stacked.setCurrentIndex(0)
+        self._video_placeholder.show()
+        self._video_placeholder.raise_()
         if not self._is_paused:
             QTimer.singleShot(self._cross_dur_ms, self._play_next_video)
         else:
@@ -411,7 +504,34 @@ class StimuliPresentation_one_by_one(QWidget):
 
     def show_feedback(self, delay):
         self.show_delay = True
-        self.delay_value = delay
+        self.delay_value = np.atleast_1d(np.asarray(delay, dtype=float))
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+
+        if hasattr(self, "_background_label"):
+            self._background = QPixmap(os.path.join(r"resources\stimuli", self.settings.background_figure)).scaled(
+                self.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation
+            )
+            self._background_label.setPixmap(self._background)
+            self._background_label.setGeometry(self.rect())
+
+        if hasattr(self, "_cross_label"):
+            self._main_cross_pic = QPixmap(self._cross_figure_path).scaled(
+                self.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation
+            )
+            self._cross_label.setPixmap(self._main_cross_pic)
+            self._cross_label.setGeometry(self.rect())
+
+        if hasattr(self, "_video_placeholder"):
+            self._video_placeholder.setPixmap(self._main_cross_pic)
+            self._video_placeholder.setGeometry(self._video_widget.rect())
+
+        if hasattr(self, "_feedback_bar_background"):
+            self._feedback_bar_background.setGeometry(self._feedback_widget.rect())
+
+        if hasattr(self, "_feedback_bar_overlay"):
+            self._feedback_bar_overlay.setGeometry(self._feedback_widget.rect())
     
 
     # === показ стимулов ===
@@ -452,12 +572,13 @@ class StimuliPresentation_one_by_one(QWidget):
         self._sequence_started = False
         self._stopped = False
         self._finished = False
+        self._counter = 0
+        self.show_delay = False
+        self.apply_sequence_settings()
 
         self._current_index = 0
         self.currIdxChanged.emit(self._current_index)
-        self.stimulus.emit(self.video_names[self.order[self._current_index]-1])
-
-        self._prepare_next_video()
+        self._stacked.setCurrentIndex(2)
         self._cross_label.show()
     
     def finish(self):
@@ -481,6 +602,30 @@ class StimuliPresentation_one_by_one(QWidget):
         QTimer.singleShot(0, self._videoEnded.emit)
         
     # === управление звуком === 
+    def _on_media_playing(self, event):
+        if not self._awaiting_first_frame:
+            return
+        QTimer.singleShot(0, self._show_video_widget)
+
+    def _prepare_feedback_bar_background(self):
+        width = max(1, self._feedback_widget.width())
+        height = max(1, self._feedback_widget.height())
+
+        snapshot_status = self._player.video_take_snapshot(0, self._feedback_snapshot_path, width, height)
+        if snapshot_status == 0 and os.path.exists(self._feedback_snapshot_path):
+            pixmap = QPixmap(self._feedback_snapshot_path)
+            if not pixmap.isNull():
+                self._feedback_bar_background.setPixmap(
+                    pixmap.scaled(
+                        self._feedback_widget.size(),
+                        Qt.KeepAspectRatio,
+                        Qt.SmoothTransformation,
+                    )
+                )
+                return
+
+        self._feedback_bar_background.setPixmap(self._video_placeholder.pixmap())
+
     def update_volume(self, value):
         self._volume = value
         self._player.audio_set_volume(self._volume)
