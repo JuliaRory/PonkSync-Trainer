@@ -14,6 +14,8 @@ class StimuliSettings:
     single_video: str = "animatedSingle1500_tms_0ms_nosounds.mkv"
     SRT_video: str = "PS__SRT.mkv" 
     SST_video: str = "animatedSingle1500_stop-200ms_tms_0ms_nosounds.mkv"
+
+    bar_figure: str = "bar_figure.png"
     
     stimuli: List[str] = field(default_factory=lambda: ["Одиночные", "Одиночные SST", "Триплеты", "Триплеты SST"])
     stimuli_type: List[str] = field(default_factory=lambda: ["Круг", "Вертикальный бар", "Горизонтальный бар"])
@@ -25,13 +27,14 @@ class StimuliSettings:
 
     stimuli_n: int = 10
     stimuli_inf: bool = True
-    cross_ms: int = 2000
-    show_feedback: int = 1000
-    feedback_ms: int = 1500
+    cross_ms: int = 1000
+    show_feedback: int = 0
+    feedback_ms: int = 2000
     feedback_mode: List[str] = field(default_factory=lambda: ["После каждой попытки", "После N попыток", "При превышении", "Без обратной связи"])
     feedback_mode_curr: int = 0
     feedback_form: List[str] = field(default_factory=lambda: ["Plot", "On the bar"])
-    feedback_form_curr: int = 0
+    feedback_form_curr: int = 1
+    sham_feedback: bool = False
     delay_limit: List[int] = field(default_factory=lambda: [50, 50, 50])
     feedback_n: int = 2
     feedback_w: int = 460

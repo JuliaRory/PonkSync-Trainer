@@ -74,6 +74,7 @@ class SettingsHandler:
         self._stimuli_panel.combo_box_feedback_mode.currentIndexChanged[int].connect(self._update_feedback_mode)
         self._stimuli_panel.combo_box_feedback_form.currentIndexChanged[int].connect(self._update_feedback_form)
         self._stimuli_panel.spin_box_feedback_n.valueChanged[int].connect(self._update_feedback_n)
+        self._stimuli_panel.check_box_sham_feedback.stateChanged.connect(self._update_sham_feedback)
         self._stimuli_panel.spin_box_limit1.valueChanged[int].connect(self._update_limit1)
         self._stimuli_panel.spin_box_limit2.valueChanged[int].connect(self._update_limit2)
         self._stimuli_panel.spin_box_limit3.valueChanged[int].connect(self._update_limit3)
@@ -210,6 +211,9 @@ class SettingsHandler:
     
     def _update_feedback_n(self, n):
         self.settings.stimuli_settings.feedback_n = n
+
+    def _update_sham_feedback(self, status):
+        self.settings.stimuli_settings.sham_feedback = bool(status)
     
     def _update_limit1(self, value):
         self.settings.stimuli_settings.delay_limit[0] = value

@@ -1,9 +1,10 @@
-from PyQt5.QtWidgets import QFrame, QVBoxLayout, QHBoxLayout, QLabel, QWidget, QSizePolicy, QShortcut, QMessageBox
+﻿from PyQt5.QtWidgets import QFrame, QVBoxLayout, QHBoxLayout, QLabel, QWidget, QSizePolicy, QShortcut, QMessageBox
 from PyQt5.QtCore import  pyqtSignal, Qt
 from PyQt5.QtGui import QKeySequence
 
 import json
 import os
+import numpy as np
 
 from utils.ui_helpers import create_button, create_spin_box, create_check_box, create_combo_box, create_shortcut, create_lineedit
 from utils.layout_utils import create_hbox, create_vbox
@@ -75,6 +76,9 @@ class StimuliControlPanel(QFrame):
         self.combo_box_feedback_mode = create_combo_box(self.settings.feedback_mode, curr_item_idx=self.settings.feedback_mode_curr, parent=self)
         self.combo_box_feedback_form = create_combo_box(self.settings.feedback_form, curr_item_idx=self.settings.feedback_form_curr, parent=self)
         self.spin_box_feedback_n = create_spin_box(0, 30, self.settings.feedback_n, parent=self)
+        
+        self.check_box_sham_feedback = create_check_box(self.settings.sham_feedback, 'sham', parent=self)
+        
         delay_limit = self.settings.delay_limit
         self.spin_box_limit1 = create_spin_box(0, 1000, delay_limit[0], parent=self)
         self.spin_box_limit2 = create_spin_box(0, 1000, delay_limit[1], parent=self)
@@ -113,6 +117,7 @@ class StimuliControlPanel(QFrame):
         layout.addWidget(self.label_stimuli_idx)
         layout.addLayout(layout_feedback_mode)
         layout.addLayout(layout_feedback_form)
+        layout.addWidget(self.check_box_sham_feedback)
         layout.addLayout(layout_feedback_n)
         layout.addLayout(layout_delay_limit1)
         layout.addLayout(layout_delay_limit2)
@@ -189,7 +194,10 @@ class StimuliControlPanel(QFrame):
 
     # == show delay === 
     def show_delay(self, delay):
-        self._player_window.show_feedback(delay)
+        values = np.atleast_1d(np.asarray(delay, dtype=float))
+        if self.settings.sham_feedback:
+            values = np.random.randint(-200, 201, size=values.shape).astype(float)
+        self._player_window.show_feedback(values)
 
     # === изменения состояния кнопок === 
     def _change_button_pause_stimuli_text(self):

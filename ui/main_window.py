@@ -98,7 +98,7 @@ class MainWindow(QWidget):
         self._data_processor.triggerIdx.connect(lambda idx: self._plot_updater.plot_trigger(idx))
         self._data_processor.peakIdx.connect(lambda idx: self._plot_updater.plot_peak(idx))
 
-        # self._data_processor.delayValue[int].connect(lambda delay: self._process_delay(delay))
+        self._data_processor.delayValue[int].connect(lambda delay: self._process_delay(delay))
         self._stimuli_panel.stimuliEnded.connect(lambda: self._data_processor.get_delays())
         self._stimuli_panel.changeFile.connect(lambda fl: self._data_processor.change_file(fl))
    
@@ -107,8 +107,16 @@ class MainWindow(QWidget):
     # logic
 
     def _process_delay(self, delay):
-        # one delay
-        # if delay > 0:
+        stimuli_settings = self.settings.stimuli_settings
+
+        # Prefill feedback before video end only for immediate single-stimulus mode.
+        if stimuli_settings.stimuli_curr == 2:
+            return
+        if stimuli_settings.feedback_mode_curr != 0:
+            return
+        if stimuli_settings.sham_feedback:
+            return
+
         print("show delay -> ")
         self._stimuli_panel.show_delay(delay)
     

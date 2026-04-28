@@ -1,10 +1,8 @@
 import numpy as np
 
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QFont, QPainter, QPen
+from PyQt5.QtGui import QColor, QFont, QPainter, QPen, QBrush
 from PyQt5.QtWidgets import QWidget
-
-from ui.feedback_graph import get_error_color, get_text_color
 
 
 class FeedbackBarOverlay(QWidget):
@@ -17,10 +15,9 @@ class FeedbackBarOverlay(QWidget):
         self._values = np.array([], dtype=float)
         self._has_input = False
         self._zero_offset_px = 350
-        self._line_width = 6
+        self._line_width = 20
+        self._line_height = 150
         self._label_step = 40
-
-        #self.hide()
 
     def set_values(self, values):
         arr = np.atleast_1d(np.asarray(values, dtype=float))
@@ -44,7 +41,7 @@ class FeedbackBarOverlay(QWidget):
         painter.setRenderHint(QPainter.Antialiasing)
 
         if self._values.size == 0:
-            painter.setPen(QPen(get_text_color(self.settings.feedback_bar_scale_ms), 1))
+            painter.setPen(QPen(Qt.black, 1))
             painter.setFont(QFont("Arial", 28, QFont.Bold))
             painter.drawText(self.rect(), Qt.AlignCenter, "not detected")
             painter.end()
@@ -53,21 +50,17 @@ class FeedbackBarOverlay(QWidget):
         center_x = self.width() // 2
         center_y = self.height() // 2
         zero_x = center_x + self._zero_offset_px
-        line_height = self.settings.feedback_bar_height_px
-        top_y = center_y - line_height // 2
-        bottom_y = center_y + line_height // 2
-        px_per_ms = self._get_px_per_ms()
+        top_y = center_y - self._line_height // 2
 
         for idx, value in enumerate(self._values):
-            x = int(np.clip(zero_x + value * px_per_ms, 0, self.width() - 1))
-            color = get_error_color(abs(value))[0]
-            text_color = get_text_color(abs(value))
+            x = int(np.clip(zero_x + value, 0, self.width() - self._line_width))
 
-            painter.setPen(QPen(color, self._line_width))
-            painter.drawLine(x, top_y, x, bottom_y)
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(QBrush(QColor("black")))
+            painter.drawRect(x - self._line_width // 2, top_y, self._line_width, self._line_height)
 
             label = f"{int(value)}"
-            painter.setPen(text_color)
+            painter.setPen(QPen(Qt.black, 1))
             painter.setFont(QFont("Arial", 24, QFont.Bold))
 
             text_width = painter.fontMetrics().horizontalAdvance(label)
@@ -75,10 +68,6 @@ class FeedbackBarOverlay(QWidget):
             text_y = max(30, top_y - 20 - idx * self._label_step)
             painter.drawText(text_x, text_y, label)
 
-        painter.end()
+            print("DRAW")
 
-    def _get_px_per_ms(self):
-        scale_ms = self.settings.feedback_bar_scale_ms
-        if scale_ms == 0:
-            return 0.0
-        return self.settings.feedback_bar_scale_px / scale_ms
+        painter.end()
