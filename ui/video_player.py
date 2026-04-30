@@ -61,6 +61,7 @@ class StimuliPresentation_one_by_one(QWidget):
         self._awaiting_feedback = False
         self._awaiting_feedback_trial_id = None
         self._feedback_trial_id = None
+        self._feedback_rendering_trial_id = None
         self._awaiting_first_frame = False
 
         self._init_state()
@@ -219,6 +220,7 @@ class StimuliPresentation_one_by_one(QWidget):
         self._awaiting_feedback = False
         self._awaiting_feedback_trial_id = None
         self._feedback_trial_id = None
+        self._feedback_rendering_trial_id = None
         self._finished = True
         self._stacked.setCurrentIndex(2)
         self._cross_label.show()
@@ -319,6 +321,7 @@ class StimuliPresentation_one_by_one(QWidget):
         winid = int(self._video_widget.winId())
         self._player.set_hwnd(winid)
 
+
     def _configure_cross_label(self):
         self._cross_widget = QWidget(self)
         self._cross_widget.setStyleSheet("background-color: black;")
@@ -371,9 +374,9 @@ class StimuliPresentation_one_by_one(QWidget):
 
     def _configure_bar_feedback_widget(self):
         self._bar_feedback_widget = QWidget(self)
-        self._bar_feedback_widget.setAttribute(Qt.WA_TranslucentBackground, True)
-        self._bar_feedback_widget.setAttribute(Qt.WA_NoSystemBackground, True)
-        self._bar_feedback_widget.setAutoFillBackground(False)
+        # self._bar_feedback_widget.setAttribute(Qt.WA_TranslucentBackground, True)
+        # self._bar_feedback_widget.setAttribute(Qt.WA_NoSystemBackground, True)
+        # self._bar_feedback_widget.setAutoFillBackground(False)
         self._bar_feedback_widget.setStyleSheet("background-color: black;")
 
         # layout = QVBoxLayout(self._bar_feedback_widget)
@@ -388,10 +391,6 @@ class StimuliPresentation_one_by_one(QWidget):
         self._feedback_bar_background.setAttribute(Qt.WA_TranslucentBackground, True)
         
         self._feedback_bar_background.setScaledContents(True)
-
-        # self._update_bar_background_pixmap()
-
-        # self._feedback_bar = QWidget(self)
 
         self._feedback_bar = FeedbackBar(w=self.width(), h=self.height(), 
                                          parent=self._bar_feedback_widget)
@@ -443,8 +442,6 @@ class StimuliPresentation_one_by_one(QWidget):
             return
         run_id = self._run_id
         
-        
-
         if self.n is not None and self._counter >= self.n:
             self._finish_sequence()
             return
@@ -456,6 +453,7 @@ class StimuliPresentation_one_by_one(QWidget):
         self._awaiting_feedback = False
         self._awaiting_feedback_trial_id = None
         self._feedback_trial_id = None
+        self._feedback_rendering_trial_id = None
 
         # запустить следующее видео
         self._video_placeholder.setPixmap(self._main_cross_pic)
@@ -472,6 +470,8 @@ class StimuliPresentation_one_by_one(QWidget):
 
         self._background_label.hide()
         self._hide_feedback_bar_mode()
+        self._cross_label.hide()
+        
 
         # подготовить следующее видео
         self._current_index += 1
@@ -500,12 +500,9 @@ class StimuliPresentation_one_by_one(QWidget):
         self._awaiting_first_frame = False
         if hasattr(self, "_video_placeholder"):
             self._video_placeholder.hide()
-        self._hide_feedback_bar_mode()
-        self._stacked.setCurrentIndex(2)
-        self._cross_label.show()
+        self._stacked.setCurrentIndex(0)
         
             # Сразу показываем placeholder перед следующим видео
-            # self._cross_label.show()
             
         self._awaiting_feedback = True
         self._awaiting_feedback_trial_id = trial_id
@@ -513,7 +510,7 @@ class StimuliPresentation_one_by_one(QWidget):
 
         if self.settings.sham_feedback and not self.show_delay:
             self.show_feedback(self._generate_sham_delay(), trial_id=trial_id)
-            
+        
         if self.show_delay and self._feedback_trial_id == trial_id:
             self._check_feedback()
         else:
@@ -531,7 +528,9 @@ class StimuliPresentation_one_by_one(QWidget):
         trial_id = self._active_trial_id if trial_id is None else trial_id
         if not self._current_trial(run_id, trial_id) or self._is_paused:
             return
-        if self.show_delay and self._feedback_trial_id == trial_id:
+        if self._feedback_rendering_trial_id == trial_id:
+            return
+        if self._feedback_trial_id == trial_id:
             self._check_feedback()
             return
         self._awaiting_feedback = False
@@ -566,10 +565,14 @@ class StimuliPresentation_one_by_one(QWidget):
         self._feedback_bar_overlay.clear()
 
     def _check_feedback(self):
+
         trial_id = self._feedback_trial_id
         run_id = self._run_id
         if trial_id is None or not self._current_trial(run_id, trial_id):
             return
+        self._feedback_rendering_trial_id = trial_id
+        
+
         print("TO SHOW", self.delay_value)
         if self.settings.feedback_form_curr == 0:
             if self.settings.stimuli_curr == 2: # triplets
@@ -590,14 +593,20 @@ class StimuliPresentation_one_by_one(QWidget):
             self._stacked.setCurrentIndex(3)
             
         # QTimer.singleShot(50, self._cross_label.hide)
-        
+    
         self.show_delay = False
         feedback_duration_ms = self._feedback_ms
         if not self._is_paused:
             self._feedback_trial_id = None
-            self._schedule(feedback_duration_ms, self._show_cross, run_id, trial_id)
+            self._schedule(feedback_duration_ms, lambda: self._finish_feedback(run_id, trial_id), run_id, trial_id)
         else:
             self._schedule(250, self._check_feedback, run_id, trial_id)
+
+    def _finish_feedback(self, run_id, trial_id):
+        if not self._current_trial(run_id, trial_id):
+            return
+        self._feedback_rendering_trial_id = None
+        self._show_cross()
 
     
     def _show_cross(self):
@@ -605,6 +614,8 @@ class StimuliPresentation_one_by_one(QWidget):
             return
         run_id = self._run_id
         trial_id = self._active_trial_id
+        if hasattr(self, "_video_placeholder"):
+            self._video_placeholder.hide()
         self._hide_feedback_bar_mode()
         self._stacked.setCurrentIndex(2)
         self._cross_label.show()
@@ -701,6 +712,7 @@ class StimuliPresentation_one_by_one(QWidget):
             self._awaiting_feedback = False
             self._awaiting_feedback_trial_id = None
             self._feedback_trial_id = None
+            self._feedback_rendering_trial_id = None
             self._sequence_started = True
             self.stimuliStarted.emit()
             self._is_paused = False
@@ -743,6 +755,7 @@ class StimuliPresentation_one_by_one(QWidget):
         self._awaiting_feedback = False
         self._awaiting_feedback_trial_id = None
         self._feedback_trial_id = None
+        self._feedback_rendering_trial_id = None
         self.apply_sequence_settings()
 
         self._current_index = 0
@@ -756,6 +769,7 @@ class StimuliPresentation_one_by_one(QWidget):
         self._awaiting_feedback = False
         self._awaiting_feedback_trial_id = None
         self._feedback_trial_id = None
+        self._feedback_rendering_trial_id = None
         self._stopped = True           # ставим флаг остановки
         self._player.stop()
         self._player.release()
