@@ -103,6 +103,6 @@ class Settings:
     processing_settings: ProcessingSettings = field(default_factory=ProcessingSettings)
     stimuli_settings: StimuliSettings = field(default_factory=StimuliSettings)
 
-    activate_bat: bool = True
+    activate_bat: bool = False
     bat_file: str = "D:\Resonance\dist_2025\control_ponk.bat"
     bat_file_home: str = "C:/Users/hodor/Documents/lab-MSU/Works/2025.10_TMS/dist_2024_11_13_imp/control.bat"

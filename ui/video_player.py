@@ -57,6 +57,9 @@ class StimuliPresentation_one_by_one(QWidget):
         self.settings = settings 
         self.show_delay = False
         self._awaiting_feedback = False
+        self._awaiting_feedback_trial_id = None
+        self._feedback_trial_id = None
+        self._awaiting_first_frame = False
 
         self._init_state()
     
@@ -70,6 +73,8 @@ class StimuliPresentation_one_by_one(QWidget):
         self._is_paused = False             # и не на паузе
 
         self._counter = 0
+        self._run_id = 0
+        self._active_trial_id = 0
         self.n = None
         self.apply_sequence_settings()
         self._awaiting_first_frame = False
@@ -86,7 +91,10 @@ class StimuliPresentation_one_by_one(QWidget):
     def set_monitor(self):
         # Настройка экрана
         screens = QApplication.instance().screens()
-        target_monitor = screens[self.settings.monitor - 1].geometry()
+        if not screens:
+            raise RuntimeError("No Qt screens are available for stimuli presentation.")
+        monitor_index = min(max(self.settings.monitor - 1, 0), len(screens) - 1)
+        target_monitor = screens[monitor_index].geometry()
         self.setGeometry(target_monitor)
         self.showFullScreen()
 
@@ -109,12 +117,25 @@ class StimuliPresentation_one_by_one(QWidget):
                 "Вертикальный бар": "vbar",
                 "Горизонтальный бар": "bar",
             }
+            if combo1_value not in key:
+                raise ValueError(f"Unknown stimuli mode: {combo1_value!r}")
+            if combo2_value not in key:
+                raise ValueError(f"Unknown stimuli type: {combo2_value!r}")
             combo1_value = key[combo1_value]
             combo2_value = key[combo2_value]
             if combo1_value == "single":
-                return data["single"][combo2_value][combo3_value]
+                try:
+                    return data["single"][combo2_value][combo3_value]
+                except KeyError as exc:
+                    raise ValueError(
+                        f"No single stimulus video for type={combo2_value!r}, fps={combo3_value!r}"
+                    ) from exc
+            elif combo1_value == "single_SST":
+                return getattr(self.settings, "SST_video", None)
             elif combo1_value == "triplets":
-                return data["triplets"][combo2_value]
+                return data.get("triplets", {}).get(combo2_value) or getattr(self.settings, "triplet_video", None)
+            elif combo1_value == "triplets_SST":
+                return getattr(self.settings, "SRT_video", None)
             return None
 
         path = get_selected_path(data, 
@@ -168,12 +189,34 @@ class StimuliPresentation_one_by_one(QWidget):
         else:
             self.set_number(self.settings.stimuli_n)
 
+    def _current_run(self, run_id):
+        return not self._stopped and run_id == self._run_id
+
+    def _current_trial(self, run_id, trial_id):
+        return self._current_run(run_id) and trial_id == self._active_trial_id
+
+    def _schedule(self, delay_ms, callback, run_id=None, trial_id=None):
+        run_id = self._run_id if run_id is None else run_id
+
+        def guarded_callback():
+            if trial_id is None:
+                if not self._current_run(run_id):
+                    return
+            elif not self._current_trial(run_id, trial_id):
+                return
+            callback()
+
+        QTimer.singleShot(delay_ms, guarded_callback)
+
     def _finish_sequence(self):
         self._player.stop()
         self._awaiting_first_frame = False
         self._is_paused = False
         self._sequence_started = False
         self.show_delay = False
+        self._awaiting_feedback = False
+        self._awaiting_feedback_trial_id = None
+        self._feedback_trial_id = None
         self._finished = True
         self._stacked.setCurrentIndex(2)
         self._cross_label.show()
@@ -393,6 +436,7 @@ class StimuliPresentation_one_by_one(QWidget):
         if self._stopped or self._is_paused:
             print('[VLC player]: stimuli presentation has been stopped.')
             return
+        run_id = self._run_id
         
         # self._background_label.hide()
         self._hide_feedback_bar_mode()
@@ -402,13 +446,22 @@ class StimuliPresentation_one_by_one(QWidget):
             return
 
         self._counter += 1
+        self._active_trial_id += 1
+        trial_id = self._active_trial_id
+        self.show_delay = False
+        self._awaiting_feedback = False
+        self._awaiting_feedback_trial_id = None
+        self._feedback_trial_id = None
 
         # запустить следующее видео
         self._video_placeholder.show()
         self._video_placeholder.raise_()
         self._awaiting_first_frame = True
+        self._player.stop()
+        self._player.set_media(self.media)
+        self._player.set_position(0)
         self._player.play()
-        QTimer.singleShot(250, self._hide_video_placeholder_fallback)
+        self._schedule(250, self._hide_video_placeholder_fallback, run_id, trial_id)
 
         # подготовить следующее видео
         self._current_index += 1
@@ -422,7 +475,7 @@ class StimuliPresentation_one_by_one(QWidget):
         self._cross_label.hide()
         self._feedback_bar_background.show()
         # Проверяем окончание видео каждые 50ms
-        QTimer.singleShot(50, self._check_video_end)
+        self._schedule(50, lambda: self._check_video_end(run_id, trial_id), run_id, trial_id)
 
     def _show_video_widget(self):
         if self._stopped:
@@ -436,33 +489,46 @@ class StimuliPresentation_one_by_one(QWidget):
         if self._awaiting_first_frame:
             self._show_video_widget()
 
-    def _check_video_end(self):
-        if self._stopped:
+    def _check_video_end(self, run_id=None, trial_id=None):
+        run_id = self._run_id if run_id is None else run_id
+        trial_id = self._active_trial_id if trial_id is None else trial_id
+        if not self._current_trial(run_id, trial_id):
             return  # больше ничего не делаем
         if self._player.get_state() == vlc.State.Ended:     # Если видео закончилось
             # Сразу показываем placeholder перед следующим видео
             # self._cross_label.show()
             
+            self._awaiting_feedback = True
+            self._awaiting_feedback_trial_id = trial_id
             self.stimuliEnded.emit()    # --> stimuli_control_panel --> main_window --> data_processor
 
             if self.settings.sham_feedback and not self.show_delay:
-                self.show_feedback(self._generate_sham_delay())
+                self.show_feedback(self._generate_sham_delay(), trial_id=trial_id)
             
-            if self.show_delay:
+            if self.show_delay and self._feedback_trial_id == trial_id:
                 self._check_feedback()
             else:
                 self._awaiting_feedback = True
-                QTimer.singleShot(self.FEEDBACK_WAIT_MS, self._show_cross_if_no_feedback)
+                self._awaiting_feedback_trial_id = trial_id
+                self._schedule(
+                    self.FEEDBACK_WAIT_MS,
+                    lambda: self._show_cross_if_no_feedback(run_id, trial_id),
+                    run_id,
+                    trial_id,
+                )
         else:
-            QTimer.singleShot(50, self._check_video_end)
+            self._schedule(50, lambda: self._check_video_end(run_id, trial_id), run_id, trial_id)
 
-    def _show_cross_if_no_feedback(self):
-        if self._stopped or self._is_paused:
+    def _show_cross_if_no_feedback(self, run_id=None, trial_id=None):
+        run_id = self._run_id if run_id is None else run_id
+        trial_id = self._active_trial_id if trial_id is None else trial_id
+        if not self._current_trial(run_id, trial_id) or self._is_paused:
             return
-        if self.show_delay:
+        if self.show_delay and self._feedback_trial_id == trial_id:
             self._check_feedback()
             return
         self._awaiting_feedback = False
+        self._awaiting_feedback_trial_id = None
         self._show_cross()
 
     def _update_feedback_graph(self, graph, value):
@@ -493,6 +559,10 @@ class StimuliPresentation_one_by_one(QWidget):
         self._feedback_bar_overlay.clear()
 
     def _check_feedback(self):
+        trial_id = self._feedback_trial_id
+        run_id = self._run_id
+        if trial_id is None or not self._current_trial(run_id, trial_id):
+            return
         print("TO SHOW", self.delay_value)
         if self.settings.feedback_form_curr == 0:
             if self.settings.stimuli_curr == 2: # triplets
@@ -517,19 +587,24 @@ class StimuliPresentation_one_by_one(QWidget):
         self.show_delay = False
         feedback_duration_ms = self._feedback_ms
         if not self._is_paused:
-            QTimer.singleShot(feedback_duration_ms, self._show_cross)
+            self._feedback_trial_id = None
+            self._schedule(feedback_duration_ms, self._show_cross, run_id, trial_id)
         else:
-            QTimer.singleShot(250, self._check_feedback)
+            self._schedule(250, self._check_feedback, run_id, trial_id)
 
     
     def _show_cross(self):
+        if self._stopped:
+            return
+        run_id = self._run_id
+        trial_id = self._active_trial_id
         self._hide_feedback_bar_mode()
         self._stacked.setCurrentIndex(2)
         self._cross_label.show()
         if not self._is_paused:
-            QTimer.singleShot(self._cross_dur_ms, self._play_next_video)
+            self._schedule(self._cross_dur_ms, self._play_next_video, run_id, trial_id)
         else:
-            QTimer.singleShot(250, self._show_cross)
+            self._schedule(250, self._show_cross, run_id, trial_id)
 
     # =======================
     # ===     события     ===
@@ -564,11 +639,16 @@ class StimuliPresentation_one_by_one(QWidget):
     # ===    логика    ===
     # ====================
 
-    def show_feedback(self, delay):
+    def show_feedback(self, delay, trial_id=None):
+        trial_id = self._awaiting_feedback_trial_id if trial_id is None else trial_id
+        if trial_id is None or not self._current_trial(self._run_id, trial_id):
+            return
         self.show_delay = True
+        self._feedback_trial_id = trial_id
         self.delay_value = np.atleast_1d(np.asarray(delay, dtype=float))
-        if self._awaiting_feedback:
+        if self._awaiting_feedback and self._awaiting_feedback_trial_id == trial_id:
             self._awaiting_feedback = False
+            self._awaiting_feedback_trial_id = None
             QTimer.singleShot(0, self._check_feedback)
 
     def _generate_sham_delay(self):
@@ -609,6 +689,11 @@ class StimuliPresentation_one_by_one(QWidget):
         # Последовательность ещё не запускалась -> начать показ стимулов
         if not self._sequence_started:
             print("[VLC player]: start the stimuli presentation.")
+            self._run_id += 1
+            self._active_trial_id = 0
+            self._awaiting_feedback = False
+            self._awaiting_feedback_trial_id = None
+            self._feedback_trial_id = None
             self._sequence_started = True
             self.stimuliStarted.emit()
             self._is_paused = False
@@ -636,6 +721,7 @@ class StimuliPresentation_one_by_one(QWidget):
 
     def restart_sequence(self):
         print("[VLC player]: restart stimuli presentation.")
+        self._run_id += 1
         self._player.stop()
 
         self._is_paused = False
@@ -643,7 +729,11 @@ class StimuliPresentation_one_by_one(QWidget):
         self._stopped = False
         self._finished = False
         self._counter = 0
+        self._active_trial_id = 0
         self.show_delay = False
+        self._awaiting_feedback = False
+        self._awaiting_feedback_trial_id = None
+        self._feedback_trial_id = None
         self.apply_sequence_settings()
 
         self._current_index = 0
@@ -653,6 +743,10 @@ class StimuliPresentation_one_by_one(QWidget):
     
     def finish(self):
         print("[VLC player]: finish the stimuli presentation and close the player.")
+        self._run_id += 1
+        self._awaiting_feedback = False
+        self._awaiting_feedback_trial_id = None
+        self._feedback_trial_id = None
         self._stopped = True           # ставим флаг остановки
         self._player.stop()
         self._player.release()
