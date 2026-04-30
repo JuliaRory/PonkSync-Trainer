@@ -11,7 +11,6 @@ from PyQt5.QtGui import QPixmap
 
 from ui.feedback_graph import FeedbackGraph
 from ui.feedback_bar import FeedbackBar
-from ui.feedback_bar_overlay import FeedbackBarOverlay
 import logging
 
 # воспроизведение стимулов идёт через VLC плеер (https://www.videolan.org/vlc/) <-- он должен быть установлен на компьютер (!!!) 
@@ -50,6 +49,8 @@ class StimuliPresentation_one_by_one(QWidget):
     BAR_FEEDBACK_MS = 2000
     FEEDBACK_WAIT_MS = 200
     VIDEO_READY_HIDE_MS = 300
+    LAST_FRAME_CAPTURE_MS = 180
+    LAST_FRAME_POLL_MS = 40
     
     def __init__(self, settings=None):
         super().__init__()  
@@ -62,7 +63,9 @@ class StimuliPresentation_one_by_one(QWidget):
         self._awaiting_feedback_trial_id = None
         self._feedback_trial_id = None
         self._feedback_rendering_trial_id = None
+        self._last_frame_ready = False
         self._awaiting_first_frame = False
+        self._last_frame_path = os.path.abspath(os.path.join("data", "_stimulus_last_frame.png"))
 
         self._init_state()
     
@@ -83,7 +86,6 @@ class StimuliPresentation_one_by_one(QWidget):
         self._awaiting_first_frame = False
         
         self._cross_figure_path = os.path.join(r"resources\stimuli", self.settings.cross_figure)
-        self._bar_figure_path = os.path.join(r"resources\stimuli", self.settings.bar_figure)
         
         # final_fig_files = os.listdir(r"resources\final_fig")
         # self.final_pic_path = os.path.join(r"resources\final_fig", random.choice(final_fig_files))
@@ -274,8 +276,6 @@ class StimuliPresentation_one_by_one(QWidget):
         self._stacked.addWidget(self._video_widget)      # индекс 0
         self._stacked.addWidget(self._feedback_widget)   # индекс 1
         self._stacked.addWidget(self._cross_widget)      # индекс 2
-        self._stacked.addWidget(self._bar_feedback_widget)  # index 3  
-
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0,0,0,0)
 
@@ -314,6 +314,12 @@ class StimuliPresentation_one_by_one(QWidget):
         self._player.audio_set_volume(self._volume)
         self._video_placeholder.hide()
         self._video_placeholder.raise_()
+
+        self._last_frame_label = QLabel(self)
+        self._last_frame_label.setGeometry(self.rect())
+        self._last_frame_label.setAlignment(Qt.AlignCenter)
+        self._last_frame_label.setStyleSheet("background-color: black;")
+        self._last_frame_label.hide()
         # layout = QVBoxLayout(self)
         # layout.setContentsMargins(0,0,0,0)
         # layout.addWidget(self._video_widget)
@@ -373,33 +379,11 @@ class StimuliPresentation_one_by_one(QWidget):
         self._show_feedback_ms = self.settings.show_feedback
 
     def _configure_bar_feedback_widget(self):
-        self._bar_feedback_widget = QWidget(self)
-        # self._bar_feedback_widget.setAttribute(Qt.WA_TranslucentBackground, True)
-        # self._bar_feedback_widget.setAttribute(Qt.WA_NoSystemBackground, True)
-        # self._bar_feedback_widget.setAutoFillBackground(False)
-        self._bar_feedback_widget.setStyleSheet("background-color: black;")
-
-        # layout = QVBoxLayout(self._bar_feedback_widget)
-        # layout.setContentsMargins(0, 0, 0, 0)
-        self._feedback_bar_background = QLabel(self._bar_feedback_widget)
-        self._bar_figure_pixmap = QPixmap(self._bar_figure_path)
-        self._feedback_bar_background.setPixmap(self._bar_figure_pixmap)
-
-        self._feedback_bar_background.setGeometry(self.rect())
-        self._feedback_bar_background.setAlignment(Qt.AlignCenter)
-        self._feedback_bar_background.setStyleSheet("background-color: black;")
-        self._feedback_bar_background.setAttribute(Qt.WA_TranslucentBackground, True)
-        
-        self._feedback_bar_background.setScaledContents(True)
-
         self._feedback_bar = FeedbackBar(w=self.width(), h=self.height(), 
-                                         parent=self._bar_feedback_widget)
+                                         parent=self)
+        self._feedback_bar.setAttribute(Qt.WA_TransparentForMouseEvents, True)
         self._feedback_bar.move(0, 0)
-        self._feedback_bar.raise_()
-
-        self._feedback_bar_overlay = FeedbackBarOverlay(self.settings, self._bar_feedback_widget)
-        self._feedback_bar_overlay.setGeometry(self._bar_feedback_widget.rect())
-        self._feedback_bar_overlay.raise_()
+        self._feedback_bar.hide()
 
     def change_stimuli(self):
         if self.settings.stimuli_curr == 2:
@@ -417,8 +401,8 @@ class StimuliPresentation_one_by_one(QWidget):
     def _show_feedback_plot_mode(self):
         self._background_label.show()
         self._background_label.lower()
-        self._feedback_bar_background.hide()
-        self._feedback_bar_overlay.clear()
+        self._last_frame_label.hide()
+        self._feedback_bar.hide()
         self.change_stimuli()
 
     def _show_feedback_bar_mode(self):
@@ -426,11 +410,21 @@ class StimuliPresentation_one_by_one(QWidget):
         self._feedback_graph.hide()
         for graph in self._feedback_graphs:
             graph.hide()
+        if hasattr(self, "_video_placeholder"):
+            self._video_placeholder.hide()
+        self._stacked.setCurrentIndex(0)
+        if self._last_frame_ready and os.path.exists(self._last_frame_path):
+            pixmap = QPixmap(self._last_frame_path)
+            if not pixmap.isNull():
+                self._last_frame_label.setPixmap(pixmap.scaled(self.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation))
+                self._last_frame_label.setGeometry(self.rect())
+                self._last_frame_label.show()
+                self._last_frame_label.raise_()
+        self._feedback_bar.setFixedSize(self.size())
+        self._feedback_bar.move(0, 0)
         self._feedback_bar.show()
-        self._feedback_bar_background.show()
-        self._feedback_bar_background.raise_()
         self._feedback_bar.raise_()
-        self._feedback_bar_overlay.raise_()
+        self._feedback_bar.update()
     
     # ===============================
     # === цикл проигрывания видео ===
@@ -467,6 +461,7 @@ class StimuliPresentation_one_by_one(QWidget):
         self._player.set_media(self.media)
         self._player.set_position(0)
         self._player.play()
+        self._schedule(self.LAST_FRAME_POLL_MS, lambda: self._capture_last_frame_loop(run_id, trial_id), run_id, trial_id)
 
         self._background_label.hide()
         self._hide_feedback_bar_mode()
@@ -491,6 +486,20 @@ class StimuliPresentation_one_by_one(QWidget):
         if hasattr(self, "_video_placeholder"):
             self._video_placeholder.hide()
         self._awaiting_first_frame = False
+
+    def _capture_last_frame_loop(self, run_id, trial_id):
+        if self._last_frame_ready or not self._current_trial(run_id, trial_id):
+            return
+
+        length = self._player.get_length()
+        current = self._player.get_time()
+        if length > 0 and current >= 0 and 0 <= length - current <= self.LAST_FRAME_CAPTURE_MS:
+            os.makedirs(os.path.dirname(self._last_frame_path), exist_ok=True)
+            if self._player.video_take_snapshot(0, self._last_frame_path, self.width(), self.height()) == 0:
+                self._last_frame_ready = True
+            return
+
+        self._schedule(self.LAST_FRAME_POLL_MS, lambda: self._capture_last_frame_loop(run_id, trial_id), run_id, trial_id)
 
     def _handle_video_end(self, run_id=None, trial_id=None):
         run_id = self._run_id if run_id is None else run_id
@@ -561,8 +570,7 @@ class StimuliPresentation_one_by_one(QWidget):
     def _hide_feedback_bar_mode(self):
         self._background_label.hide()
         self._feedback_bar.hide()
-        self._feedback_bar_background.hide()
-        self._feedback_bar_overlay.clear()
+        self._last_frame_label.hide()
 
     def _check_feedback(self):
 
@@ -590,7 +598,6 @@ class StimuliPresentation_one_by_one(QWidget):
         else:
             self._update_feedback_bar(self._feedback_bar, self.delay_value[0])
             self._show_feedback_bar_mode()
-            self._stacked.setCurrentIndex(3)
             
         # QTimer.singleShot(50, self._cross_label.hide)
     
@@ -694,12 +701,12 @@ class StimuliPresentation_one_by_one(QWidget):
             self._video_placeholder.setPixmap(self._main_cross_pic)
             self._video_placeholder.setGeometry(self.rect())
 
-        if hasattr(self, "_feedback_bar_background"):
-            self._feedback_bar_background.setGeometry(self._bar_feedback_widget.rect())
-            self._update_bar_background_pixmap()
+        if hasattr(self, "_last_frame_label"):
+            self._last_frame_label.setGeometry(self.rect())
 
-        if hasattr(self, "_feedback_bar_overlay"):
-            self._feedback_bar_overlay.setGeometry(self._bar_feedback_widget.rect())
+        if hasattr(self, "_feedback_bar"):
+            self._feedback_bar.setFixedSize(self.size())
+            self._feedback_bar.move(0, 0)
     
 
     # === показ стимулов ===
