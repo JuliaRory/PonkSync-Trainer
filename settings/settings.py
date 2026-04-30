@@ -81,7 +81,7 @@ class ProcessingSettings:
 @dataclass
 class DetectionSettings:
     bit: int = 4
-    window_ms:  List[int] = field(default_factory=lambda: [-375, 375])
+    window_ms:  List[int] = field(default_factory=lambda: [-500, 375])
     threshold: int = 4
     threshold_mv: float = 0.5
     thr_adaptive: bool = False
@@ -95,7 +95,6 @@ class DetectionSettings:
 class Settings:
     data_source: str = "nvx136"  # "SPEED"
     
-
     Fs: int = 5000  # Hz
     
     detection_settings: DetectionSettings = field(default_factory=DetectionSettings)
