@@ -42,12 +42,14 @@ class StimuliPresentation_one_by_one(QWidget):
     volumeChanged = pyqtSignal(int)
     playerIsMuted = pyqtSignal()
     currIdxChanged = pyqtSignal(int)
-    _videoEnded = pyqtSignal()
+    _videoEnded = pyqtSignal(int, int)
+    _mediaPlaying = pyqtSignal(int, int)
     stimuliEnded = pyqtSignal()       # --> stimuli_control_panel --> main_window --> data_processor
 
     stimulus = pyqtSignal(str)
     BAR_FEEDBACK_MS = 2000
     FEEDBACK_WAIT_MS = 200
+    VIDEO_READY_HIDE_MS = 80
     
     def __init__(self, settings=None):
         super().__init__()  
@@ -237,6 +239,8 @@ class StimuliPresentation_one_by_one(QWidget):
         events = self._player.event_manager()
         events.event_attach(vlc.EventType.MediaPlayerEndReached, self._on_end_reached)
         events.event_attach(vlc.EventType.MediaPlayerPlaying, self._on_media_playing)
+        self._videoEnded.connect(self._handle_video_end)
+        self._mediaPlaying.connect(self._handle_media_playing)
 
         # === background === 
 
@@ -454,14 +458,15 @@ class StimuliPresentation_one_by_one(QWidget):
         self._feedback_trial_id = None
 
         # запустить следующее видео
+        self._video_placeholder.setPixmap(self._main_cross_pic)
         self._video_placeholder.show()
         self._video_placeholder.raise_()
+        self._stacked.setCurrentIndex(0)
         self._awaiting_first_frame = True
         self._player.stop()
         self._player.set_media(self.media)
         self._player.set_position(0)
         self._player.play()
-        self._schedule(250, self._hide_video_placeholder_fallback, run_id, trial_id)
 
         # подготовить следующее видео
         self._current_index += 1
@@ -472,11 +477,7 @@ class StimuliPresentation_one_by_one(QWidget):
         # Скрываем placeholder через 50ms после старта VLC
         # delay = 50
         # QTimer.singleShot(delay, self._cross_label.hide)
-        self._cross_label.hide()
-        self._feedback_bar_background.show()
         # Проверяем окончание видео каждые 50ms
-        self._schedule(50, lambda: self._check_video_end(run_id, trial_id), run_id, trial_id)
-
     def _show_video_widget(self):
         if self._stopped:
             return
@@ -485,39 +486,39 @@ class StimuliPresentation_one_by_one(QWidget):
             self._video_placeholder.hide()
         self._awaiting_first_frame = False
 
-    def _hide_video_placeholder_fallback(self):
-        if self._awaiting_first_frame:
-            self._show_video_widget()
-
-    def _check_video_end(self, run_id=None, trial_id=None):
+    def _handle_video_end(self, run_id=None, trial_id=None):
         run_id = self._run_id if run_id is None else run_id
         trial_id = self._active_trial_id if trial_id is None else trial_id
         if not self._current_trial(run_id, trial_id):
             return  # больше ничего не делаем
-        if self._player.get_state() == vlc.State.Ended:     # Если видео закончилось
+        self._awaiting_first_frame = False
+        if hasattr(self, "_video_placeholder"):
+            self._video_placeholder.hide()
+        self._hide_feedback_bar_mode()
+        self._stacked.setCurrentIndex(2)
+        self._cross_label.show()
+        
             # Сразу показываем placeholder перед следующим видео
             # self._cross_label.show()
             
+        self._awaiting_feedback = True
+        self._awaiting_feedback_trial_id = trial_id
+        self.stimuliEnded.emit()    # --> stimuli_control_panel --> main_window --> data_processor
+
+        if self.settings.sham_feedback and not self.show_delay:
+            self.show_feedback(self._generate_sham_delay(), trial_id=trial_id)
+            
+        if self.show_delay and self._feedback_trial_id == trial_id:
+            self._check_feedback()
+        else:
             self._awaiting_feedback = True
             self._awaiting_feedback_trial_id = trial_id
-            self.stimuliEnded.emit()    # --> stimuli_control_panel --> main_window --> data_processor
-
-            if self.settings.sham_feedback and not self.show_delay:
-                self.show_feedback(self._generate_sham_delay(), trial_id=trial_id)
-            
-            if self.show_delay and self._feedback_trial_id == trial_id:
-                self._check_feedback()
-            else:
-                self._awaiting_feedback = True
-                self._awaiting_feedback_trial_id = trial_id
-                self._schedule(
-                    self.FEEDBACK_WAIT_MS,
-                    lambda: self._show_cross_if_no_feedback(run_id, trial_id),
-                    run_id,
-                    trial_id,
-                )
-        else:
-            self._schedule(50, lambda: self._check_video_end(run_id, trial_id), run_id, trial_id)
+            self._schedule(
+                self.FEEDBACK_WAIT_MS,
+                lambda: self._show_cross_if_no_feedback(run_id, trial_id),
+                run_id,
+                trial_id,
+            )
 
     def _show_cross_if_no_feedback(self, run_id=None, trial_id=None):
         run_id = self._run_id if run_id is None else run_id
@@ -703,7 +704,8 @@ class StimuliPresentation_one_by_one(QWidget):
         # Последовательность идёт -> остановить показ стимулов
         if not self._is_paused:
             print("[VLC player]: pause the stimuli presentation.")
-            self._player.pause()
+            if self._player.get_state() in (vlc.State.Opening, vlc.State.Buffering, vlc.State.Playing):
+                self._player.pause()
             self._is_paused = True
             self.stimuliPaused.emit()
             return
@@ -711,7 +713,8 @@ class StimuliPresentation_one_by_one(QWidget):
         # Показ стимулов на паузе -> продолжить
         if self._is_paused:
             print("[VLC player]: continue the stimuli presentation.")
-            self._player.play()
+            if self._player.get_state() == vlc.State.Paused:
+                self._player.play()
             self._is_paused = False
             self.stimuliPaused.emit()
 
@@ -763,13 +766,16 @@ class StimuliPresentation_one_by_one(QWidget):
         if self._is_paused:
             return  # если вдруг pause совпал с концом
         
-        QTimer.singleShot(0, self._videoEnded.emit)
+        self._videoEnded.emit(self._run_id, self._active_trial_id)
         
     # === управление звуком === 
     def _on_media_playing(self, event):
-        if not self._awaiting_first_frame:
+        self._mediaPlaying.emit(self._run_id, self._active_trial_id)
+
+    def _handle_media_playing(self, run_id, trial_id):
+        if not self._current_trial(run_id, trial_id) or not self._awaiting_first_frame:
             return
-        QTimer.singleShot(0, self._show_video_widget)
+        self._schedule(self.VIDEO_READY_HIDE_MS, self._show_video_widget, run_id, trial_id)
 
     def update_volume(self, value):
         self._volume = value
