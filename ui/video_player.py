@@ -49,7 +49,7 @@ class StimuliPresentation_one_by_one(QWidget):
     stimulus = pyqtSignal(str)
     BAR_FEEDBACK_MS = 2000
     FEEDBACK_WAIT_MS = 200
-    VIDEO_READY_HIDE_MS = 80
+    VIDEO_READY_HIDE_MS = 300
     
     def __init__(self, settings=None):
         super().__init__()  
@@ -272,7 +272,7 @@ class StimuliPresentation_one_by_one(QWidget):
         self._stacked.addWidget(self._video_widget)      # индекс 0
         self._stacked.addWidget(self._feedback_widget)   # индекс 1
         self._stacked.addWidget(self._cross_widget)      # индекс 2
-        self._stacked.addWidget(self._bar_feedback_widget)  # index 3
+        self._stacked.addWidget(self._bar_feedback_widget)  # index 3  
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0,0,0,0)
@@ -302,14 +302,15 @@ class StimuliPresentation_one_by_one(QWidget):
         video_placeholder_pixmap = QPixmap(self._cross_figure_path).scaled(
                 self.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation
             )
-        self._video_placeholder = QLabel(self._video_widget)
+        self._video_placeholder = QLabel(self)
         self._video_placeholder.setPixmap(video_placeholder_pixmap)
-        self._video_placeholder.setGeometry(self._video_widget.rect())
+        self._video_placeholder.setGeometry(self.rect())
         self._video_placeholder.setAlignment(Qt.AlignCenter)
-        self._video_placeholder.setStyleSheet("background:transparent;")
+        self._video_placeholder.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+        self._video_placeholder.setStyleSheet("background-color: black;")
         
         self._player.audio_set_volume(self._volume)
-        self._video_placeholder.show()
+        self._video_placeholder.hide()
         self._video_placeholder.raise_()
         # layout = QVBoxLayout(self)
         # layout.setContentsMargins(0,0,0,0)
@@ -442,8 +443,7 @@ class StimuliPresentation_one_by_one(QWidget):
             return
         run_id = self._run_id
         
-        # self._background_label.hide()
-        self._hide_feedback_bar_mode()
+        
 
         if self.n is not None and self._counter >= self.n:
             self._finish_sequence()
@@ -459,14 +459,19 @@ class StimuliPresentation_one_by_one(QWidget):
 
         # запустить следующее видео
         self._video_placeholder.setPixmap(self._main_cross_pic)
+        self._video_placeholder.setGeometry(self.rect())
         self._video_placeholder.show()
         self._video_placeholder.raise_()
+
         self._stacked.setCurrentIndex(0)
         self._awaiting_first_frame = True
         self._player.stop()
         self._player.set_media(self.media)
         self._player.set_position(0)
         self._player.play()
+
+        self._background_label.hide()
+        self._hide_feedback_bar_mode()
 
         # подготовить следующее видео
         self._current_index += 1
@@ -478,6 +483,7 @@ class StimuliPresentation_one_by_one(QWidget):
         # delay = 50
         # QTimer.singleShot(delay, self._cross_label.hide)
         # Проверяем окончание видео каждые 50ms
+
     def _show_video_widget(self):
         if self._stopped:
             return
@@ -675,7 +681,7 @@ class StimuliPresentation_one_by_one(QWidget):
 
         if hasattr(self, "_video_placeholder"):
             self._video_placeholder.setPixmap(self._main_cross_pic)
-            self._video_placeholder.setGeometry(self._video_widget.rect())
+            self._video_placeholder.setGeometry(self.rect())
 
         if hasattr(self, "_feedback_bar_background"):
             self._feedback_bar_background.setGeometry(self._bar_feedback_widget.rect())
