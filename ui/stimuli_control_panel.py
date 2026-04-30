@@ -197,6 +197,7 @@ class StimuliControlPanel(QFrame):
         values = np.atleast_1d(np.asarray(delay, dtype=float))
         if self.settings.sham_feedback:
             values = np.random.randint(-200, 201, size=values.shape).astype(float)
+        print("--> show delay", values)
         self._player_window.show_feedback(values)
 
     # === изменения состояния кнопок === 

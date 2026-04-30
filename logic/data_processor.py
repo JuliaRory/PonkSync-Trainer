@@ -58,6 +58,8 @@ class DataProcessor(QObject):
 
         self._ponk_count = 0
         self._delays = []
+        self._feedback_cursor = 0
+        self._pending_feedback_requests = 0
         self._feedback_counter = 0  # для показа N усреднённого фидбэка
 
         self._coef = 1000 / self.settings.Fs
@@ -74,6 +76,11 @@ class DataProcessor(QObject):
         self.logger.close()
         self.logger = ExperimentLogger(filename)
         self.logger.set_output_stream(self.output_stream_ponk)
+        self._delays = []
+        self._feedback_counter = 0
+        self._feedback_cursor = 0
+        self._pending_feedback_requests = 0
+        self._trigger = None
 
     @pyqtSlot(object, float)
     def add_pack(self, pack, ts):
@@ -151,7 +158,7 @@ class DataProcessor(QObject):
                     'duration': int(duration), 
                     'amplitude': amp
                 }
-                print("DELAY {}".format(delay))
+                print("DETECTED DELAY {}".format(delay))
                 
             else:
                 print("NO PEAK HAS BEEN DETECTED")
@@ -166,11 +173,12 @@ class DataProcessor(QObject):
             data["mode"] = "TKEO" if self.settings.processing_settings.tkeo else "EMG"
             data['threshold'] = threshold
             self.logger.log_trial(data)
-            print("PONK COUNTER", self._ponk_count)
+            # print("PONK COUNTER", self._ponk_count)
             self._delays.append(delay)       # накапливает все задержки  
             self._feedback_counter += 1      # для показа N-усреднённой обратной связи
             self._ponk_count += 1
-            self._trigger = None 
+            self._trigger = None
+            self._try_emit_feedback()
 
 
     def get_delays(self):
@@ -180,25 +188,24 @@ class DataProcessor(QObject):
         """
 
         s = self.settings.stimuli_settings
-        
-        stimuli = s.stimuli_curr # 0 - single, 1 - single SST, 2 - triplets, 3 - triplets SS
-        feedback = s.feedback_mode_curr
+
+        if s.feedback_mode_curr == 3:
+            self._feedback_cursor = len(self._delays)
+            return
+
+        self._pending_feedback_requests += 1
+        self._try_emit_feedback()
+        return
+
         
         if feedback == 3:   # если режим без ОС
             return
         
-        if len(self._delays) == 0: 
-            print("NO DELAYS")
-            return 
-        
-        # if feedback == 0 or 2 (and if delays are above limit in case of feedback == 2)
-        send_feedback = True
-        feedack_values = np.array(self._delays[-3:]) if stimuli == 2 else np.array([self._delays[-1]])      # three or one last delays
         
         if feedback == 2: # показывать если отклонение превышает заданные границы
             limits = s.delay_limit
             send_feedback = any(abs(value) > limit for value, limit in zip(feedack_values, limits))  # False if all below limit
-            print(send_feedback, [value > limit for value, limit in zip(feedack_values, limits)])
+            # print("TO SEND", send_feedback, [value > limit for value, limit in zip(feedack_values, limits)])
 
         elif feedback == 1:  # показывать после накопления N значений усреднённую версию
             send_feedback = self._feedback_counter >= s.feedback_n
@@ -211,6 +218,56 @@ class DataProcessor(QObject):
         if send_feedback:
             # self.logger.info(f"Delays: {feedack_values}.")
             self.delayValues.emit(feedack_values) 
+            print("TO SEND", feedack_values)
+
+    def _ponks_per_stimulus(self):
+        stimuli = self.settings.stimuli_settings.stimuli_curr
+        return 3 if stimuli == 2 else 1
+
+    def _try_emit_feedback(self):
+        s = self.settings.stimuli_settings
+        feedback = s.feedback_mode_curr
+
+        if feedback == 3:
+            self._pending_feedback_requests = 0
+            self._feedback_cursor = len(self._delays)
+            return
+
+        n_ponk = self._ponks_per_stimulus()
+
+        while self._pending_feedback_requests > 0:
+            available = len(self._delays) - self._feedback_cursor
+
+            if feedback == 1:
+                required_requests = max(1, int(s.feedback_n))
+                required_delays = required_requests * n_ponk
+                if self._pending_feedback_requests < required_requests or available < required_delays:
+                    return
+
+                values = np.array(self._delays[self._feedback_cursor:self._feedback_cursor + required_delays])
+                feedack_values = np.nanmean(values.reshape((required_requests, n_ponk)), axis=0)
+                self._feedback_cursor += required_delays
+                self._pending_feedback_requests -= required_requests
+                self._feedback_counter = 0
+                self.delayValues.emit(feedack_values)
+                print("TO SEND", feedack_values)
+                continue
+
+            if available < n_ponk:
+                return
+
+            feedack_values = np.array(self._delays[self._feedback_cursor:self._feedback_cursor + n_ponk])
+            self._feedback_cursor += n_ponk
+            self._pending_feedback_requests -= 1
+
+            send_feedback = True
+            if feedback == 2:
+                limits = s.delay_limit
+                send_feedback = any(abs(value) > limit for value, limit in zip(feedack_values, limits))
+
+            if send_feedback:
+                self.delayValues.emit(feedack_values)
+                print("TO SEND", feedack_values)
 
     
     # === signal parsing === 
@@ -225,7 +282,7 @@ class DataProcessor(QObject):
         trigger_diff = np.diff(trigger)
         event = np.where(trigger_diff == 1)[0]      # 0 -> 1 
         if len(event) != 0:
-            print("EVENT SOUND", bit, event)
+            # print("EVENT SOUND", bit, event)
             idx =-(len(trigger) - event[0]-1)
             self.triggerIdx.emit(idx)
             self._trigger = self.ts[idx]       # для обработки поньков  [ms]

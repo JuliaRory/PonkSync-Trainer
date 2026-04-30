@@ -106,7 +106,7 @@ class FeedbackBar(QWidget):
 
     def draw_label(self, painter):
         coef = 0.5
-        center_x = self.width() // 2 + self._zero_offset_px + int(coef * self.vertex_x)
+        center_x = self.width() // 2 + self._zero_offset_px + int(coef * self.vertex_x)-20
         center_y = self.height() // 2
 
         label = f"{self.vertex_x}"
@@ -115,7 +115,7 @@ class FeedbackBar(QWidget):
         text_y = center_y - self._rect_height // 2 - self._label_offset_y
 
         painter.setPen(self.text_color)
-        painter.setFont(QFont("Arial", 24, QFont.Bold))
+        painter.setFont(QFont("Arial", 30, QFont.Bold))
         painter.drawText(text_x, text_y, label)
 
 

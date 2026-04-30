@@ -47,7 +47,7 @@ class StimuliPresentation_one_by_one(QWidget):
 
     stimulus = pyqtSignal(str)
     BAR_FEEDBACK_MS = 2000
-    FEEDBACK_WAIT_MS = 200
+    FEEDBACK_WAIT_MS = 400
     VIDEO_READY_HIDE_MS = 300
     LAST_FRAME_CAPTURE_MS = 180
     LAST_FRAME_POLL_MS = 40
@@ -522,6 +522,7 @@ class StimuliPresentation_one_by_one(QWidget):
         
         if self.show_delay and self._feedback_trial_id == trial_id:
             self._check_feedback()
+            print("show without waiting", self.delay_value)
         else:
             self._awaiting_feedback = True
             self._awaiting_feedback_trial_id = trial_id
@@ -533,6 +534,7 @@ class StimuliPresentation_one_by_one(QWidget):
             )
 
     def _show_cross_if_no_feedback(self, run_id=None, trial_id=None):
+        print("waiting")
         run_id = self._run_id if run_id is None else run_id
         trial_id = self._active_trial_id if trial_id is None else trial_id
         if not self._current_trial(run_id, trial_id) or self._is_paused:
@@ -540,6 +542,7 @@ class StimuliPresentation_one_by_one(QWidget):
         if self._feedback_rendering_trial_id == trial_id:
             return
         if self._feedback_trial_id == trial_id:
+            print("show after waiting", self.delay_value, trial_id)
             self._check_feedback()
             return
         self._awaiting_feedback = False
@@ -573,15 +576,12 @@ class StimuliPresentation_one_by_one(QWidget):
         self._last_frame_label.hide()
 
     def _check_feedback(self):
-
         trial_id = self._feedback_trial_id
         run_id = self._run_id
         if trial_id is None or not self._current_trial(run_id, trial_id):
             return
         self._feedback_rendering_trial_id = trial_id
         
-
-        print("TO SHOW", self.delay_value)
         if self.settings.feedback_form_curr == 0:
             if self.settings.stimuli_curr == 2: # triplets
                 d1 = int(self.delay_value[0]) if np.isfinite(self.delay_value[0]) else np.nan
@@ -598,7 +598,7 @@ class StimuliPresentation_one_by_one(QWidget):
         else:
             self._update_feedback_bar(self._feedback_bar, self.delay_value[0])
             self._show_feedback_bar_mode()
-            
+        print("SHOW FEEDBACK ", self.delay_value)
         # QTimer.singleShot(50, self._cross_label.hide)
     
         self.show_delay = False
@@ -665,11 +665,15 @@ class StimuliPresentation_one_by_one(QWidget):
     # ====================
 
     def show_feedback(self, delay, trial_id=None):
-        trial_id = self._awaiting_feedback_trial_id if trial_id is None else trial_id
+        if trial_id is None:
+            trial_id = self._awaiting_feedback_trial_id
+        if trial_id is None and self._sequence_started:
+            trial_id = self._active_trial_id
         if trial_id is None or not self._current_trial(self._run_id, trial_id):
             return
         self.show_delay = True
         self._feedback_trial_id = trial_id
+        print("trial ID {}, delay {}". format(trial_id, delay))
         self.delay_value = np.atleast_1d(np.asarray(delay, dtype=float))
         if self._awaiting_feedback and self._awaiting_feedback_trial_id == trial_id:
             self._awaiting_feedback = False
@@ -678,7 +682,7 @@ class StimuliPresentation_one_by_one(QWidget):
 
     def _generate_sham_delay(self):
         n_values = 3 if self.settings.stimuli_curr == 2 else 1
-        return np.random.randint(-200, 201, size=n_values).astype(float)
+        return 0#np.random.randint(-200, 201, size=n_values).astype(float)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)

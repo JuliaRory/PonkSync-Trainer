@@ -72,9 +72,9 @@ class ProcessingSettings:
     tkeo: bool = True
     extra_samples: int = 500
     montage_list: List[str] = field(default_factory=lambda: ["bipolar", "monopolar"])
-    montage: str = 0
+    montage: str = 1
     emg_channels_bipolar: List[int] = field(default_factory=lambda: [64, 65])
-    emg_channels_monopolar: int = 0
+    emg_channels_monopolar: int = 1
 
     freq: int = 5000 # Hz
 
@@ -102,6 +102,6 @@ class Settings:
     processing_settings: ProcessingSettings = field(default_factory=ProcessingSettings)
     stimuli_settings: StimuliSettings = field(default_factory=StimuliSettings)
 
-    activate_bat: bool = False
+    activate_bat: bool = True
     bat_file: str = "D:\Resonance\dist_2025\control_ponk.bat"
     bat_file_home: str = "C:/Users/hodor/Documents/lab-MSU/Works/2025.10_TMS/dist_2024_11_13_imp/control.bat"

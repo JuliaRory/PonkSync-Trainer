@@ -117,7 +117,7 @@ class MainWindow(QWidget):
         if stimuli_settings.sham_feedback:
             return
 
-        print("show delay -> ")
+        print("show delay -> ", delay)
         self._stimuli_panel.show_delay(delay)
     
     def _process_delays(self, delays):
