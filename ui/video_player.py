@@ -67,6 +67,7 @@ class StimuliPresentation_one_by_one(QWidget):
         self._marker_visible_during_current_video = False
         self._video_playback_active = False
         self._last_frame_ready = False
+        self._last_frame_pixmap = QPixmap()
         self._awaiting_first_frame = False
         self._last_frame_path = os.path.abspath(os.path.join("data", "_stimulus_last_frame.png"))
 
@@ -580,6 +581,12 @@ class StimuliPresentation_one_by_one(QWidget):
         self._video_placeholder.hide()
         self._video_placeholder.raise_()
 
+        self._last_frame_label = QLabel(self)
+        self._last_frame_label.setGeometry(self.rect())
+        self._last_frame_label.setAlignment(Qt.AlignCenter)
+        self._last_frame_label.setStyleSheet("background-color: black;")
+        self._last_frame_label.hide()
+
         # layout = QVBoxLayout(self)
         # layout.setContentsMargins(0,0,0,0)
         # layout.addWidget(self._video_widget)
@@ -618,13 +625,6 @@ class StimuliPresentation_one_by_one(QWidget):
     def _configure_feedback_widget(self):
         self._feedback_widget = QWidget(self)
         self._feedback_widget.setStyleSheet("background:transparent;")
-
-        self._last_frame_label = QLabel(self._feedback_widget)
-        self._last_frame_label.setGeometry(self._feedback_widget.rect())
-        self._last_frame_label.setAlignment(Qt.AlignCenter)
-        self._last_frame_label.setStyleSheet("background-color: black;")
-        self._last_frame_label.hide()
-        self._last_frame_label.lower()
 
         w, h = self.settings.feedback_w, self.settings.feedback_h
 
@@ -672,6 +672,7 @@ class StimuliPresentation_one_by_one(QWidget):
             graph.hide()
 
     def _clear_last_frame_background(self, remove_file=False):
+        self._last_frame_pixmap = QPixmap()
         if hasattr(self, "_last_frame_label"):
             self._last_frame_label.clear()
             self._last_frame_label.hide()
@@ -681,21 +682,36 @@ class StimuliPresentation_one_by_one(QWidget):
             except OSError:
                 pass
 
-    def _show_last_frame_background(self):
-        if not self._last_frame_ready or not os.path.exists(self._last_frame_path):
+    def _capture_last_frame_from_screen(self):
+        screen = QApplication.screenAt(self.geometry().center()) or QApplication.primaryScreen()
+        if screen is None:
             return False
 
-        pixmap = QPixmap(self._last_frame_path)
+        geometry = self.geometry()
+        pixmap = screen.grabWindow(0, geometry.x(), geometry.y(), geometry.width(), geometry.height())
         if pixmap.isNull():
             return False
 
-        target_size = self._feedback_widget.size() if hasattr(self, "_feedback_widget") else self.size()
+        self._last_frame_pixmap = pixmap
+        self._last_frame_ready = True
+        return True
+
+    def _show_last_frame_background(self):
+        if not self._last_frame_ready:
+            return False
+
+        pixmap = self._last_frame_pixmap
+        if pixmap.isNull() and os.path.exists(self._last_frame_path):
+            pixmap = QPixmap(self._last_frame_path)
+        if pixmap.isNull():
+            return False
+
         self._last_frame_label.setPixmap(
-            pixmap.scaled(target_size, Qt.IgnoreAspectRatio, Qt.SmoothTransformation)
+            pixmap.scaled(self.size(), Qt.IgnoreAspectRatio, Qt.SmoothTransformation)
         )
-        self._last_frame_label.setGeometry(self._feedback_widget.rect())
+        self._last_frame_label.setGeometry(self.rect())
         self._last_frame_label.show()
-        self._last_frame_label.lower()
+        self._last_frame_label.raise_()
         if hasattr(self, "_background_label"):
             self._background_label.hide()
             self._background_label.lower()
@@ -703,23 +719,37 @@ class StimuliPresentation_one_by_one(QWidget):
 
     def _show_feedback_plot_mode(self):
         self._video_widget.hide()
-        self._background_label.hide()
+        self._background_label.show()
         self._background_label.lower()
-        self._show_last_frame_background()
+        self._last_frame_label.hide()
         self._feedback_bar.hide()
         if hasattr(self, "_video_placeholder"):
             self._video_placeholder.hide()
         self.change_stimuli()
+        if self.settings.stimuli_curr == 2:
+            for graph in self._feedback_graphs:
+                graph.raise_()
+        else:
+            self._feedback_graph.raise_()
         self._show_marker()
 
     def _show_feedback_bar_mode(self):
-        self._video_widget.hide()
         self._background_label.hide()
         self._hide_feedback_plot_widgets()
         if hasattr(self, "_video_placeholder"):
             self._video_placeholder.hide()
-        self._show_last_frame_background()
-        self._stacked.setCurrentIndex(1)
+        self._stacked.setCurrentIndex(0)
+        if self._last_frame_ready:
+            pixmap = self._last_frame_pixmap
+            if pixmap.isNull() and os.path.exists(self._last_frame_path):
+                pixmap = QPixmap(self._last_frame_path)
+            if not pixmap.isNull():
+                self._last_frame_label.setPixmap(
+                    pixmap.scaled(self.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                )
+                self._last_frame_label.setGeometry(self.rect())
+                self._last_frame_label.show()
+                self._last_frame_label.raise_()
         self._feedback_bar.setFixedSize(self.size())
         self._feedback_bar.move(0, 0)
         self._feedback_bar.show()
@@ -820,6 +850,7 @@ class StimuliPresentation_one_by_one(QWidget):
         if length > 0 and current >= 0 and 0 <= length - current <= self.LAST_FRAME_CAPTURE_MS:
             os.makedirs(os.path.dirname(self._last_frame_path), exist_ok=True)
             if self._player.video_take_snapshot(0, self._last_frame_path, self.width(), self.height()) == 0:
+                self._last_frame_pixmap = QPixmap(self._last_frame_path)
                 self._last_frame_ready = True
             return
 
@@ -832,18 +863,11 @@ class StimuliPresentation_one_by_one(QWidget):
             return  # больше ничего не делаем
         self._awaiting_first_frame = False
         self._video_playback_active = False
-        if not self._last_frame_ready:
-            os.makedirs(os.path.dirname(self._last_frame_path), exist_ok=True)
-            if self._player.video_take_snapshot(0, self._last_frame_path, self.width(), self.height()) == 0:
-                self._last_frame_ready = True
-        self._player.stop()
-        self._detach_video_output()
-        self._video_widget.hide()
         self._hide_feedback_plot_widgets()
         if hasattr(self, "_video_placeholder"):
             self._video_placeholder.hide()
-        self._stacked.setCurrentIndex(2)
-        self._cross_label.show()
+        self._stacked.setCurrentIndex(0)
+        self._cross_label.hide()
         # self._cross_label.show()
         
             # Сразу показываем placeholder перед следующим видео
@@ -1051,7 +1075,7 @@ class StimuliPresentation_one_by_one(QWidget):
             self._video_placeholder.setGeometry(self.rect())
 
         if hasattr(self, "_last_frame_label"):
-            self._last_frame_label.setGeometry(self._feedback_widget.rect())
+            self._last_frame_label.setGeometry(self.rect())
             if self._last_frame_label.isVisible():
                 self._show_last_frame_background()
 
