@@ -49,7 +49,7 @@ class StimuliPresentation_one_by_one(QWidget):
     BAR_FEEDBACK_MS = 2000
     FEEDBACK_WAIT_MS = 400
     VIDEO_READY_HIDE_MS = 300
-    LAST_FRAME_CAPTURE_MS = 180
+    LAST_FRAME_CAPTURE_MS = 300
     LAST_FRAME_POLL_MS = 40
     MARKER_STIMULUS = "audio_countdown_3.mkv"
     
@@ -745,27 +745,43 @@ class StimuliPresentation_one_by_one(QWidget):
         if hasattr(self, "_video_placeholder"):
             self._video_placeholder.hide()
 
-        self._video_widget.show()
+        # self._video_widget.show()
+        self._video_widget.hide()          # VLC больше не фон
         self._stacked.setCurrentIndex(0)
 
-        if self._last_frame_ready:
-            pixmap = self._last_frame_pixmap
-            if pixmap.isNull() and os.path.exists(self._last_frame_path):
-                pixmap = QPixmap(self._last_frame_path)
+        shown = self._show_last_frame_background()
 
-            if not pixmap.isNull():
-                self._last_frame_label.setPixmap(
-                    pixmap.scaled(self.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
-                )
-                self._last_frame_label.setGeometry(self.rect())
-                self._last_frame_label.show()
-                self._last_frame_label.raise_()
+        if not shown:
+            # fallback лучше крест/placeholder, чем черный фон
+            self._video_placeholder.setPixmap(self._main_cross_pic)
+            self._video_placeholder.setGeometry(self.rect())
+            self._video_placeholder.show()
+            self._video_placeholder.raise_()
 
         self._feedback_bar.setFixedSize(self.size())
         self._feedback_bar.move(0, 0)
         self._feedback_bar.show()
         self._feedback_bar.raise_()
         self._feedback_bar.update()
+
+        # if self._last_frame_ready:
+        #     pixmap = self._last_frame_pixmap
+        #     if pixmap.isNull() and os.path.exists(self._last_frame_path):
+        #         pixmap = QPixmap(self._last_frame_path)
+
+        #     if not pixmap.isNull():
+        #         self._last_frame_label.setPixmap(
+        #             pixmap.scaled(self.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        #         )
+        #         self._last_frame_label.setGeometry(self.rect())
+        #         self._last_frame_label.show()
+        #         self._last_frame_label.raise_()
+
+        # self._feedback_bar.setFixedSize(self.size())
+        # self._feedback_bar.move(0, 0)
+        # self._feedback_bar.show()
+        # self._feedback_bar.raise_()
+        # self._feedback_bar.update()
     
     # ===============================
     # === цикл проигрывания видео ===
@@ -910,16 +926,23 @@ class StimuliPresentation_one_by_one(QWidget):
         #     self._capture_last_frame_from_screen()
         self._awaiting_first_frame = False
         self._video_playback_active = False
-        self._hide_feedback_plot_widgets()
-        if hasattr(self, "_video_placeholder"):
-            self._video_placeholder.hide()
-        self._stacked.setCurrentIndex(0)
-        self._cross_label.hide()
+        self._player.pause()  # или не stop; главное не давать VLC очистить окно
+
+        # if self._last_frame_ready:
+        #     self._show_last_frame_background()
+            
+        # self._hide_feedback_plot_widgets()
+        # if hasattr(self, "_video_placeholder"):
+        #     self._video_placeholder.hide()
+
+        # self._stacked.setCurrentIndex(0)
+        # self._cross_label.hide()
         # self._cross_label.show()
         
             # Сразу показываем placeholder перед следующим видео
             
-        self._show_marker()
+        # self._show_marker() #what is it?? 
+
         self._awaiting_feedback = True
         self._awaiting_feedback_trial_id = trial_id
         self.stimuliEnded.emit()    # --> stimuli_control_panel --> main_window --> data_processor
