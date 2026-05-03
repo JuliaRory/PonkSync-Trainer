@@ -67,10 +67,17 @@ class StimuliControlPanel(QFrame):
         self.combo_box_stimuli = create_combo_box(self.settings.stimuli, curr_item_idx=self.settings.stimuli_curr, parent=self)
         self.combo_box_stimuli_type = create_combo_box(self.settings.stimuli_type, curr_item_idx=self.settings.stimuli_type_curr, parent=self)
         self.combo_box_fps = create_combo_box(self.settings.fps, curr_item_idx=self.settings.fps_curr, parent=self)
+        saved_stimuli_names = self._load_saved_stimuli_names()
+        if saved_stimuli_names and self.settings.saved_stimuli_curr not in saved_stimuli_names:
+            self.settings.saved_stimuli_curr = saved_stimuli_names[0]
+        self.combo_box_saved_stimuli = create_combo_box(saved_stimuli_names, curr_item=self.settings.saved_stimuli_curr, parent=self)
+        self.check_box_stimuli_sequence_mode = create_check_box(self.settings.sequence_mode, 'Режим записи', parent=self)
         
         
         self.spin_box_stimuli_n = create_spin_box(0, 100, self.settings.stimuli_n, parent=self)
         self.check_box_stimuli_inf = create_check_box(self.settings.stimuli_inf, '∞', parent=self)
+        self.spin_box_isi_min = create_spin_box(0, 60, self.settings.isi_min_s, data_type="float", decimals=1, step=0.1, parent=self, w=60)
+        self.spin_box_isi_max = create_spin_box(0, 60, self.settings.isi_max_s, data_type="float", decimals=1, step=0.1, parent=self, w=60)
 
         self.spin_box_monitor = create_spin_box(1, 3, self.settings.monitor, parent=self)
         self.check_box_stimuli_record = create_check_box(self.settings.record, 'Запись NVX', parent=self)
@@ -98,8 +105,10 @@ class StimuliControlPanel(QFrame):
         layout_start = create_hbox([self.button_stimuli, self.button_stimuli_pause, self.check_box_stimuli_record])
         layout_stimuli = create_hbox([self.combo_box_stimuli, QLabel("fps:"), self.combo_box_fps, self.button_stimuli_restart])
         layout_stimuli_type = create_hbox([QLabel("Тип стимулов:"), self.combo_box_stimuli_type])
+        layout_saved_stimuli = create_hbox([self.check_box_stimuli_sequence_mode, self.combo_box_saved_stimuli])
         
         layout_number = create_hbox([QLabel("монитор", self), self.spin_box_monitor, QLabel("N:", self), self.spin_box_stimuli_n, QLabel("или", self), self.check_box_stimuli_inf])
+        layout_isi = create_hbox([QLabel("ISI:", self), QLabel("min", self), self.spin_box_isi_min, QLabel("max", self), self.spin_box_isi_max, QLabel("s", self)])
 
         layout_feedback_mode = create_hbox([QLabel("Режим ОС", self), self.combo_box_feedback_mode])
         layout_feedback_form = create_hbox([QLabel("Форма ОС", self), self.combo_box_feedback_form])
@@ -114,7 +123,9 @@ class StimuliControlPanel(QFrame):
         layout.addLayout(layout_start)
         layout.addLayout(layout_stimuli)
         layout.addLayout(layout_stimuli_type)
+        layout.addLayout(layout_saved_stimuli)
         layout.addLayout(layout_number)
+        layout.addLayout(layout_isi)
         
         layout.addWidget(self.label_stimuli_idx)
         layout.addLayout(layout_feedback_mode)
@@ -135,6 +146,7 @@ class StimuliControlPanel(QFrame):
         self.button_stimuli_pause.clicked.connect(self._on_pause_stimuli_button_click)
         self.button_stimuli_restart.clicked.connect(self._on_restart_stimuli_presentation)
         self.button_show_results.clicked.connect(self._on_show_results)
+        self.check_box_stimuli_sequence_mode.stateChanged.connect(self._update_recording_mode_widgets)
 
     
     def _update_connections(self):
@@ -154,6 +166,25 @@ class StimuliControlPanel(QFrame):
     # =======================
     # =====   Логика    =====
     # =======================
+
+    def _load_saved_stimuli_names(self):
+        try:
+            with open(self.settings.saved_stimuli_filename, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            return []
+        if not isinstance(data, dict):
+            return []
+        return list(data.keys())
+
+    def _update_recording_mode_widgets(self):
+        sequence_mode = self.check_box_stimuli_sequence_mode.isChecked()
+        self.combo_box_saved_stimuli.setEnabled(sequence_mode)
+        self.combo_box_stimuli.setEnabled(not sequence_mode)
+        self.combo_box_stimuli_type.setEnabled(not sequence_mode)
+        self.combo_box_fps.setEnabled(not sequence_mode)
+        self.spin_box_stimuli_n.setEnabled(not sequence_mode)
+        self.check_box_stimuli_inf.setEnabled(not sequence_mode)
 
     def _on_stimuli_button_click(self):
         # если стимул-презентейшн уже открыт -> хотим закрыть
@@ -390,6 +421,7 @@ class StimuliControlPanel(QFrame):
         
     def _finilize(self):
         # self._update_combo_box_stimuli()
+        self._update_recording_mode_widgets()
         print('that is it')
     
 

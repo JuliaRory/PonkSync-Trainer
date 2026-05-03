@@ -81,11 +81,14 @@ class StimuliPresentation_one_by_one(QWidget):
         self._counter = 0
         self._run_id = 0
         self._active_trial_id = 0
+        self._saved_sequence_order = []
+        self._saved_sequence_set = {}
+        self._saved_sequence_cross_filename = None
+        self._saved_sequence_cross_ms = None
         self.n = None
         self.apply_sequence_settings()
         self._awaiting_first_frame = False
-        
-        self._cross_figure_path = os.path.join(r"resources\stimuli", self.settings.cross_figure)
+        self._apply_cross_settings()
         
         # final_fig_files = os.listdir(r"resources\final_fig")
         # self.final_pic_path = os.path.join(r"resources\final_fig", random.choice(final_fig_files))
@@ -103,7 +106,95 @@ class StimuliPresentation_one_by_one(QWidget):
         self.setGeometry(target_monitor)
         self.showFullScreen()
 
+    def _sequence_mode_enabled(self):
+        return bool(getattr(self.settings, "sequence_mode", False))
+
+    def _load_saved_sequence(self):
+        filename = getattr(self.settings, "saved_stimuli_filename", r"resources/saved_stimuli.json")
+        with open(filename, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        sequence_name = getattr(self.settings, "saved_stimuli_curr", "")
+        if sequence_name not in data:
+            if not data:
+                raise ValueError("No saved stimulus sequences were found.")
+            sequence_name = next(iter(data))
+            self.settings.saved_stimuli_curr = sequence_name
+
+        sequence = data[sequence_name]
+        self._saved_sequence_set = {str(k): v for k, v in sequence.get("set", {}).items()}
+        self._saved_sequence_order = [str(item) for item in sequence.get("order", [])]
+
+        cross = sequence.get("cross", {})
+        self._saved_sequence_cross_filename = cross.get("filename", self.settings.cross_figure)
+        self._saved_sequence_cross_ms = int(cross.get("dur_ms", self.settings.cross_ms))
+
+    def _current_cross_filename(self):
+        if self._sequence_mode_enabled() and self._saved_sequence_cross_filename:
+            return self._saved_sequence_cross_filename
+        return self.settings.cross_figure
+
+    def _current_cross_duration_ms(self):
+        return self._next_cross_duration_ms()
+
+    def _next_cross_duration_ms(self):
+        min_s = float(getattr(self.settings, "isi_min_s", self.settings.cross_ms / 1000))
+        max_s = float(getattr(self.settings, "isi_max_s", min_s))
+        if max_s < min_s:
+            min_s, max_s = max_s, min_s
+        if np.isclose(min_s, max_s):
+            return int(round(min_s * 1000))
+        return int(round(np.random.uniform(min_s, max_s) * 1000))
+
+    def _apply_cross_settings(self):
+        self._cross_figure_path = os.path.join(r"resources\stimuli", self._current_cross_filename())
+        self._cross_dur_ms = self._current_cross_duration_ms()
+
+        if "_cross_label" not in self.__dict__:
+            return
+
+        self._main_cross_pic = QPixmap(self._cross_figure_path).scaled(
+            self.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation
+        )
+        self._cross_label.setPixmap(self._main_cross_pic)
+        self._cross_label.setGeometry(self.rect())
+
+        if "_video_placeholder" in self.__dict__:
+            self._video_placeholder.setPixmap(self._main_cross_pic)
+            self._video_placeholder.setGeometry(self.rect())
+
+    def _set_media_from_filename(self, filename):
+        if not filename:
+            raise ValueError("Empty stimulus video filename.")
+
+        self._video_path = os.path.join(r"resources\stimuli", filename)
+        if not os.path.exists(self._video_path):
+            raise FileNotFoundError(f"Stimulus video not found: {self._video_path}")
+
+        self.media = self._instance.media_new(self._video_path)
+        self._player.set_media(self.media)
+        self.media.parse_async()
+
+    def _set_sequence_video_path(self, sequence_index):
+        if not self._saved_sequence_order:
+            self._load_saved_sequence()
+
+        key = self._saved_sequence_order[sequence_index]
+        filename = self._saved_sequence_set.get(key)
+        if filename is None:
+            raise ValueError(f"Stimulus code {key!r} is not present in saved sequence set.")
+        self._set_media_from_filename(filename)
+
     def set_video_path(self):
+        if self._sequence_mode_enabled():
+            if not self._saved_sequence_order:
+                self._load_saved_sequence()
+            if self._saved_sequence_order:
+                sequence_index = min(self._counter, len(self._saved_sequence_order) - 1)
+                self._set_sequence_video_path(sequence_index)
+            self._apply_cross_settings()
+            return
+
         stimuli = self.settings.stimuli_curr
         stimuli_type = self.settings.stimuli_type_curr
         fps = self.settings.fps_curr
@@ -175,24 +266,20 @@ class StimuliPresentation_one_by_one(QWidget):
         if not path:
             raise ValueError("Could not resolve a stimulus video path from the current settings.")
 
-        self._video_path = os.path.join(r"resources\stimuli", path)
-        if not os.path.exists(self._video_path):
-            raise FileNotFoundError(f"Stimulus video not found: {self._video_path}")
-
-        # === Подготовка последовательности ===
-        self.media = self._instance.media_new(self._video_path)
-        self._player.set_media(self.media)
-        # self.media.add_option(':start-time=1.56')
-        self.media.parse_async()  # preload
+        self._set_media_from_filename(path)
 
     def set_number(self, n=None):
         self.n = None if n is None else max(0, int(n))
 
     def apply_sequence_settings(self):
-        if self.settings.stimuli_inf:
+        if self._sequence_mode_enabled():
+            self._load_saved_sequence()
+            self.set_number(len(self._saved_sequence_order))
+        elif self.settings.stimuli_inf:
             self.set_number(None)
         else:
             self.set_number(self.settings.stimuli_n)
+        self._apply_cross_settings()
 
     def _current_run(self, run_id):
         return not self._stopped and run_id == self._run_id
@@ -346,7 +433,7 @@ class StimuliPresentation_one_by_one(QWidget):
         self._cross_label.setAlignment(Qt.AlignCenter)
         self._cross_label.setStyleSheet("background:transparent;")
 
-        self._cross_dur_ms = self.settings.cross_ms      # проигрвать крест 
+        self._cross_dur_ms = self._current_cross_duration_ms()
 
         # первый стимул
         self._current_index = 0
@@ -439,6 +526,10 @@ class StimuliPresentation_one_by_one(QWidget):
         if self.n is not None and self._counter >= self.n:
             self._finish_sequence()
             return
+
+        sequence_index = self._counter
+        if self._sequence_mode_enabled():
+            self._set_sequence_video_path(sequence_index)
 
         self._counter += 1
         self._active_trial_id += 1
@@ -627,6 +718,7 @@ class StimuliPresentation_one_by_one(QWidget):
         self._stacked.setCurrentIndex(2)
         self._cross_label.show()
         if not self._is_paused:
+            self._cross_dur_ms = self._next_cross_duration_ms()
             self._schedule(self._cross_dur_ms, self._play_next_video, run_id, trial_id)
         else:
             self._schedule(250, self._show_cross, run_id, trial_id)

@@ -69,6 +69,10 @@ class SettingsHandler:
         
         self._stimuli_panel.spin_box_stimuli_n.valueChanged[int].connect(self._update_stimuli_n)
         self._stimuli_panel.check_box_stimuli_inf.stateChanged.connect(self._update_stimuli_inf)
+        self._stimuli_panel.spin_box_isi_min.valueChanged[float].connect(self._update_isi_min)
+        self._stimuli_panel.spin_box_isi_max.valueChanged[float].connect(self._update_isi_max)
+        self._stimuli_panel.check_box_stimuli_sequence_mode.stateChanged.connect(self._update_sequence_mode)
+        self._stimuli_panel.combo_box_saved_stimuli.currentTextChanged.connect(self._update_saved_stimuli)
         self._stimuli_panel.spin_box_monitor.valueChanged[int].connect(self._update_monitor)
         self._stimuli_panel.check_box_stimuli_record.stateChanged.connect(self._update_record_status)
         self._stimuli_panel.combo_box_feedback_mode.currentIndexChanged[int].connect(self._update_feedback_mode)
@@ -195,6 +199,26 @@ class SettingsHandler:
         pw = getattr(self.ui._stimuli_panel, "_player_window", None)
         if isinstance(pw, QWidget) and not pw.isHidden():
             self.ui._stimuli_panel._player_window.apply_sequence_settings()
+
+    def _update_isi_min(self, value):
+        self.settings.stimuli_settings.isi_min_s = float(value)
+
+    def _update_isi_max(self, value):
+        self.settings.stimuli_settings.isi_max_s = float(value)
+
+    def _update_sequence_mode(self, status):
+        self.settings.stimuli_settings.sequence_mode = bool(status)
+        self._refresh_player_sequence()
+
+    def _update_saved_stimuli(self, sequence_name):
+        self.settings.stimuli_settings.saved_stimuli_curr = sequence_name
+        self._refresh_player_sequence()
+
+    def _refresh_player_sequence(self):
+        pw = getattr(self.ui._stimuli_panel, "_player_window", None)
+        if isinstance(pw, QWidget) and not pw.isHidden():
+            self.ui._stimuli_panel._player_window.apply_sequence_settings()
+            self.ui._stimuli_panel._player_window.set_video_path()
     
     def _update_monitor(self, n):
         self.settings.stimuli_settings.monitor = n

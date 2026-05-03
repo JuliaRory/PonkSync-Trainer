@@ -223,4 +223,5 @@ class MainWindow(QWidget):
         if self.settings.activate_bat:
             service = self._resonance.getService("Resonance-control")     # Берем сервис
             service.sendTransition('!terminate')
+
         event.accept()

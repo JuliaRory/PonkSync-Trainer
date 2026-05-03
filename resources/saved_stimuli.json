@@ -1,0 +1,142 @@
+{   
+    "bar_10-30_rest_vs_motor_1":{
+        "set": {
+            "1": "animatedSingle1500_tms_0ms_nosounds_bar.mkv", 
+            "2": "rest1500_tms_0ms_bar.mkv",
+            "3": "audio_countdown_3.mkv"
+        },
+        "order": [
+            3,1,1,1,1,2,1,2,1,2,1,1,2,1,1,1,2,1,1,1,1,1,1,1,2,1,1,1,2,1,1,1,1,2,1,1,2,1,1,2,1
+        ],
+        "cross": {
+            "dur_ms": 3000,
+            "filename": "cross_image_white_photomark.png"
+        }
+    },
+    "bar_10-30_rest_vs_motor_2":{
+        "set": {
+            "1": "animatedSingle1500_tms_0ms_nosounds_bar.mkv", 
+            "2": "rest1500_tms_0ms_bar.mkv",
+            "3": "audio_countdown_3.mkv"
+        },
+        "order": [
+            3,1,2,1,1,1,2,1,1,1,2,1,1,2,1,1,2,1,1,1,1,2,1,1,1,2,1,2,1,1,1,1,1,2,1,1,1,1,2,1,1
+        ],
+        "cross": {
+            "dur_ms": 3000,
+            "filename": "cross_image_white_photomark.png"
+        }
+    },
+    "bar_10-30_rest_vs_motor_3":{
+        "set": {
+            "1": "animatedSingle1500_tms_0ms_nosounds_bar.mkv", 
+            "2": "rest1500_tms_0ms_bar.mkv",
+            "3": "audio_countdown_3.mkv"
+        },
+        "order": [
+            3,1,1,1,1,1,2,1,1,1,2,1,2,1,1,1,2,1,1,2,1,1,1,1,2,1,1,1,2,1,1,2,1,1,2,1,1,1,1,1,2
+        ],
+        "cross": {
+            "dur_ms": 3000,
+            "filename": "cross_image_white_photomark.png"
+        }
+    },
+    "bar_10-30_rest_vs_motor_4":{
+        "set": {
+            "1": "animatedSingle1500_tms_0ms_nosounds_bar.mkv", 
+            "2": "rest1500_tms_0ms_bar.mkv",
+            "3": "audio_countdown_3.mkv"
+        },
+        "order": [
+            3,1,2,1,1,1,1,1,1,2,1,1,2,1,1,2,1,1,1,1,2,1,2,1,1,1,2,1,1,2,1,1,1,1,2,1,2,1,1,1,1
+        ],
+        "cross": {
+            "dur_ms": 3000,
+            "filename": "cross_image_white_photomark.png"
+        }
+    },
+    "bar_60-20_SST_1": {
+        "set": {
+            "1": "animatedSingle1500_tms_0ms_nosounds_bar_continue.mkv", 
+            "2": "animatedSingle1500_stop-200ms_tms_0ms_nosounds_bar_continue.mkv",
+            "3": "audio_countdown_3.mkv"
+        },
+        "order": [
+            3,1,1,1,1,2,1,2,1,2,1,1,2,1,1,1,2,1,1,1,1,1,1,1,2,1,1,1,2,1,1,1,1,2,1,1,2,1,1,2,1,1,1,1,2,1,2,1,1,2,1,1,1,1,2,1,1,1,1,2,1,1,1,2,1,1,1,2,1,1,2,1,1,1,2,1,1,1,1,2,1
+        ],
+        "cross": {
+            "dur_ms": 3000,
+            "filename": "cross_image_white_photomark.png"
+        }
+    },
+    "bar_60-20_SST_2": {
+        "set": {
+            "1": "animatedSingle1500_tms_0ms_nosounds_bar_continue.mkv", 
+            "2": "animatedSingle1500_stop-200ms_tms_0ms_nosounds_bar_continue.mkv",
+            "3": "audio_countdown_3.mkv"
+        },
+        "order": [
+            3,1,2,1,1,1,2,1,1,1,2,1,1,2,1,1,2,1,1,1,1,2,1,1,1,2,1,2,1,1,1,1,1,2,1,1,1,1,1,2,1,1,1,2,1,1,2,1,1,1,2,1,1,2,1,2,1,1,1,1,1,1,1,1,2,1,1,2,1,2,1,1,1,1,2,1,1,2,1,1,1
+        ],
+        "cross": {
+            "dur_ms": 3000,
+            "filename": "cross_image_white_photomark.png"
+        }
+    },
+    "bar_60-20_SST_3": {
+        "set": {
+            "1": "animatedSingle1500_tms_0ms_nosounds_bar_continue.mkv", 
+            "2": "animatedSingle1500_stop-200ms_tms_0ms_nosounds_bar_continue.mkv",
+            "3": "audio_countdown_3.mkv"
+        },
+        "order": [
+            3,1,1,1,1,1,2,1,1,1,2,1,2,1,1,1,2,1,1,2,1,1,1,1,2,1,1,1,2,1,1,2,1,1,2,1,1,1,1,1,2,1,2,1,1,1,2,1,2,1,1,1,1,1,2,1,1,1,1,1,2,1,1,1,2,1,1,1,2,1,1,2,1,1,1,1,2,1,1,1,2
+        ],
+        "cross": {
+            "dur_ms": 3000,
+            "filename": "cross_image_white_photomark.png"
+        }
+    },
+    "bar_60-20_SST_4": {
+        "set": {
+            "1": "animatedSingle1500_tms_0ms_nosounds_bar_continue.mkv", 
+            "2": "animatedSingle1500_stop-200ms_tms_0ms_nosounds_bar_continue.mkv",
+            "3": "audio_countdown_3.mkv"
+        },
+        "order": [
+            3,1,2,1,1,1,1,1,1,2,1,1,2,1,1,2,1,1,1,1,2,1,2,1,1,1,2,1,1,2,1,1,1,1,2,1,2,1,1,1,1,1,1,1,1,2,1,1,1,2,1,1,2,1,1,2,1,2,1,1,1,1,2,1,1,1,1,2,1,1,2,1,1,1,1,2,1,1,2,1,1
+        ],
+        "cross": {
+            "dur_ms": 3000,
+            "filename": "cross_image_white_photomark.png"
+        }
+    },
+    "bar_60-20_SST_5": {
+        "set": {
+            "1": "animatedSingle1500_tms_0ms_nosounds_bar_continue.mkv", 
+            "2": "animatedSingle1500_stop-200ms_tms_0ms_nosounds_bar_continue.mkv",
+            "3": "audio_countdown_3.mkv"
+        },
+        "order": [
+            3,1,1,1,1,2,1,1,2,1,1,1,2,1,1,1,2,1,1,2,1,1,1,2,1,2,1,1,1,1,1,2,1,1,2,1,1,2,1,1,1,1,1,1,1,2,1,1,1,2,1,1,1,1,2,1,1,1,1,1,2,1,1,1,2,1,2,1,1,1,2,1,1,2,1,2,1,1,2,1,1
+        ],
+        "cross": {
+            "dur_ms": 3000,
+            "filename": "cross_image_white_photomark.png"
+        }
+    },
+    
+    "test": {
+        "set": {
+            "1": "audio_countdown_3.mkv",
+            "2": "Astim_testUI_triplet_x20pure.mkv"
+        },
+        "order": [
+            1, 2
+        ],
+        "cross": {
+            "dur_ms": 3000,
+            "filename": "cross_image_white_photomark.png"
+        }
+    }
+}

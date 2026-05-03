@@ -27,7 +27,12 @@ class StimuliSettings:
 
     stimuli_n: int = 10
     stimuli_inf: bool = True
+    saved_stimuli_filename: str = r"resources/saved_stimuli.json"
+    saved_stimuli_curr: str = "bar_60-20_SST_1"
+    sequence_mode: bool = False
     cross_ms: int = 1000
+    isi_min_s: float = 1.0
+    isi_max_s: float = 3.0
     show_feedback: int = 0
     feedback_ms: int = 2000
     feedback_mode: List[str] = field(default_factory=lambda: ["После каждой попытки", "После N попыток", "При превышении", "Без обратной связи"])
