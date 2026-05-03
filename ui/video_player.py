@@ -447,16 +447,16 @@ class StimuliPresentation_one_by_one(QWidget):
     def _attach_video_output(self):
         if getattr(self, "_video_output_attached", False):
             return
-        self._player.set_hwnd(self._video_hwnd)
-        self._video_output_attached = True
+        # self._player.set_hwnd(self._video_hwnd)
+        # self._video_output_attached = True
 
     def _detach_video_output(self):
         if not getattr(self, "_video_output_attached", False):
             return
-        try:
-            self._player.set_hwnd(0)
-        finally:
-            self._video_output_attached = False
+        # try:
+        #     self._player.set_hwnd(0)
+        # finally:
+        #     self._video_output_attached = False
 
     def _show_final_image(self):
         self._detach_video_output()
@@ -498,7 +498,8 @@ class StimuliPresentation_one_by_one(QWidget):
             '--no-osd',
             '--quiet',
             '--no-sub-autodetect-file', 
-            '--no-spu'
+            '--no-spu',
+            '--no-snapshot-preview'
             )
 
 
@@ -588,6 +589,7 @@ class StimuliPresentation_one_by_one(QWidget):
         self._last_frame_label.setAlignment(Qt.AlignCenter)
         self._last_frame_label.setStyleSheet("background-color: black;")
         self._last_frame_label.hide()
+
 
         # layout = QVBoxLayout(self)
         # layout.setContentsMargins(0,0,0,0)
@@ -706,20 +708,36 @@ class StimuliPresentation_one_by_one(QWidget):
             return False
 
         pixmap = self._last_frame_pixmap
+
         if pixmap.isNull() and os.path.exists(self._last_frame_path):
+            
             pixmap = QPixmap(self._last_frame_path)
         if pixmap.isNull():
             return False
 
-        self._last_frame_label.setPixmap(
-            pixmap.scaled(self.size(), Qt.IgnoreAspectRatio, Qt.SmoothTransformation)
-        )
-        self._last_frame_label.setGeometry(self.rect())
+        self._last_frame_label.hide()
+        self._last_frame_label.setParent(self)
+        self._last_frame_label.setWindowFlags(Qt.Widget)
+        self._last_frame_label.setScaledContents(True)
+        self._last_frame_label.setAlignment(Qt.AlignCenter)
+        self._last_frame_label.setGeometry(0, 0, self.width(), self.height())
+        self._last_frame_label.setPixmap(pixmap)
         self._last_frame_label.show()
         self._last_frame_label.raise_()
-        if hasattr(self, "_background_label"):
-            self._background_label.hide()
-            self._background_label.lower()
+        
+        
+        # self._last_frame_label.setParent(self)
+        # self._last_frame_label.setGeometry(self.rect())
+        # self._last_frame_label.setAlignment(Qt.AlignCenter)
+        # self._last_frame_label.setPixmap(
+        #     pixmap.scaled(self.size(), Qt.IgnoreAspectRatio, Qt.SmoothTransformation)
+        # )
+        
+        # self._last_frame_label.show()
+        # self._last_frame_label.raise_()
+        # if hasattr(self, "_background_label"):
+        #     self._background_label.hide()
+        #     self._background_label.lower()
         return True
 
     def _show_feedback_plot_mode(self):
@@ -888,6 +906,11 @@ class StimuliPresentation_one_by_one(QWidget):
 
         length = self._player.get_length()
         current = self._player.get_time()
+
+        # if True:
+        #     self._last_frame_ready = True
+        #     self._last_frame_pixmap = QPixmap(r"resources\stimuli\bar_figure.png")
+        #     return 
 
         if length > 0 and current >= 0 and 0 <= length - current <= self.LAST_FRAME_CAPTURE_MS:
             os.makedirs(os.path.dirname(self._last_frame_path), exist_ok=True)
