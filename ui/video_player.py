@@ -48,7 +48,7 @@ class StimuliPresentation_one_by_one(QWidget):
     stimulus = pyqtSignal(str)
     BAR_FEEDBACK_MS = 2000
     FEEDBACK_WAIT_MS = 400
-    VIDEO_READY_HIDE_MS = 500
+    VIDEO_READY_HIDE_MS = 300
     LAST_FRAME_CAPTURE_MS = 180
     LAST_FRAME_POLL_MS = 40
     MARKER_STIMULUS = "audio_countdown_3.mkv"
@@ -498,8 +498,7 @@ class StimuliPresentation_one_by_one(QWidget):
             '--no-osd',
             '--quiet',
             '--no-sub-autodetect-file', 
-            '--no-spu', 
-            '--no-embedded-video'
+            '--no-spu'
             )
 
 
@@ -595,8 +594,10 @@ class StimuliPresentation_one_by_one(QWidget):
         # layout.addWidget(self._video_widget)
 
         self._video_hwnd = int(self._video_widget.winId())
-        self._video_output_attached = False
-        self._attach_video_output()
+        self._player.set_hwnd(self._video_hwnd)
+        # self._video_output_attached = False
+
+        # self._attach_video_output()
 
 
     def _configure_cross_label(self):
@@ -740,13 +741,18 @@ class StimuliPresentation_one_by_one(QWidget):
     def _show_feedback_bar_mode(self):
         self._background_label.hide()
         self._hide_feedback_plot_widgets()
+
         if hasattr(self, "_video_placeholder"):
             self._video_placeholder.hide()
+
+        self._video_widget.show()
         self._stacked.setCurrentIndex(0)
+
         if self._last_frame_ready:
             pixmap = self._last_frame_pixmap
             if pixmap.isNull() and os.path.exists(self._last_frame_path):
                 pixmap = QPixmap(self._last_frame_path)
+
             if not pixmap.isNull():
                 self._last_frame_label.setPixmap(
                     pixmap.scaled(self.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
@@ -754,11 +760,11 @@ class StimuliPresentation_one_by_one(QWidget):
                 self._last_frame_label.setGeometry(self.rect())
                 self._last_frame_label.show()
                 self._last_frame_label.raise_()
+
         self._feedback_bar.setFixedSize(self.size())
         self._feedback_bar.move(0, 0)
         self._feedback_bar.show()
         self._feedback_bar.raise_()
-        self._show_marker()
         self._feedback_bar.update()
     
     # ===============================
@@ -870,19 +876,23 @@ class StimuliPresentation_one_by_one(QWidget):
         if length > 0 and current >= 0 and 0 <= length - current <= self.LAST_FRAME_CAPTURE_MS:
             os.makedirs(os.path.dirname(self._last_frame_path), exist_ok=True)
 
-            ok = self._player.video_take_snapshot(
-                0,
-                self._last_frame_path,
-                self.width(),
-                self.height()
-            ) == 0
+            # ok = self._player.video_take_snapshot(
+            #     0,
+            #     self._last_frame_path,
+            #     self.width(),
+            #     self.height()
+            # ) == 0
 
-            if ok and os.path.exists(self._last_frame_path) and os.path.getsize(self._last_frame_path) > 0:
-                pixmap = QPixmap(self._last_frame_path)
-                if not pixmap.isNull():
-                    self._last_frame_pixmap = pixmap
-                    self._last_frame_ready = True
-                    return
+            # if ok and os.path.exists(self._last_frame_path) and os.path.getsize(self._last_frame_path) > 0:
+            #     pixmap = QPixmap(self._last_frame_path)
+            #     if not pixmap.isNull():
+            #         self._last_frame_pixmap = pixmap
+            #         self._last_frame_ready = True
+            #         return
+            if self._player.video_take_snapshot(0, self._last_frame_path, self.width(), self.height()) == 0:
+                self._last_frame_ready = True
+                self._last_frame_pixmap = QPixmap(self._last_frame_path)
+                return
 
         self._schedule(
             self.LAST_FRAME_POLL_MS,
@@ -896,8 +906,8 @@ class StimuliPresentation_one_by_one(QWidget):
         trial_id = self._active_trial_id if trial_id is None else trial_id
         if not self._current_trial(run_id, trial_id):
             return  # больше ничего не делаем
-        if not self._last_frame_ready:
-            self._capture_last_frame_from_screen()
+        # if not self._last_frame_ready:
+        #     self._capture_last_frame_from_screen()
         self._awaiting_first_frame = False
         self._video_playback_active = False
         self._hide_feedback_plot_widgets()
