@@ -793,7 +793,7 @@ class StimuliPresentation_one_by_one(QWidget):
 
         # запустить следующее видео
         self._marker_visible_during_current_video = self._should_show_marker_for_stimulus(self._current_stimulus_filename)
-        self._attach_video_output()
+        # self._attach_video_output()
         self._video_widget.show()
         self._video_placeholder.setPixmap(self._main_cross_pic)
         self._video_placeholder.setGeometry(self.rect())
