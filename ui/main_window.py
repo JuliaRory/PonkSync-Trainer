@@ -29,12 +29,13 @@ from utils.ui_helpers import create_button
 WIDTH_SET, HEIGHT_SET = 1400, 800
 
 class MainWindow(QWidget):
-    def __init__(self, input_data_stream, input_message_stream, output_stream_ponk, resonance):
+    def __init__(self, input_data_stream, input_message_stream, output_stream_ponk, output_stream_stimuli, resonance):
         super().__init__()
         self.setWindowTitle("SyncPonk Trainer")
         # self.setWindowIcon(QIcon(r"./resources/icon.png"))
 
         self._resonance = resonance                       # прокси для управления резонансными модулями
+        self._output_stream_stimuli = output_stream_stimuli
         self.settings = Settings()                        # Хранилище настроек
 
         self._input_stream = StreamSource(input_data_stream, input_message_stream)                              # Приёмник (онлайн) данных
@@ -72,7 +73,7 @@ class MainWindow(QWidget):
         self._filter_panel = FilterPanel(self.settings, parent=self)
         self._peak_panel = PeakDetectionPanel(self.settings, parent=self)
         self._figure_panel = OnlineGraph(self.settings, self._data_processor, parent=self)       # создать блок с графиками миограммы            --> self.plot_emg_graph
-        self._stimuli_panel = StimuliControlPanel(self.settings, self._resonance, parent=self)
+        self._stimuli_panel = StimuliControlPanel(self.settings, self._resonance, self._output_stream_stimuli, parent=self)
         self._mep_window = None
         self._mep_panel = QFrame(self)
         self._button_mep_plots = create_button("MEP plots", parent=self._mep_panel, w=120)

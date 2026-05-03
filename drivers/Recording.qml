@@ -67,11 +67,14 @@ DSM.StateMachine {
                     //    stream_name                    )}
                     recorder.addStream('discover:///?stream=eeg&name=nvx136', 'eeg')
 
-                    let service = ResonanceApp.getService("TEP_visual");
-                    if (service) {recorder.addStream('discover:///?stream=stimuli&name=TEP_visual', 'stimuli');}
+                    let tepVisualService = ResonanceApp.getService("TEP_visual");
+                    if (tepVisualService) {recorder.addStream('discover:///?stream=stimuli&name=TEP_visual', 'stimuli');}
 
-                    let service = ResonanceApp.getService("PonkSync_Trainer");
-                    if (service) {recorder.addStream('discover:///?stream=ponk_data&name=PonkSync_Trainer', 'ponk_data');}
+                    let ponkSyncService = ResonanceApp.getService("PonkSync-Trainer");
+                    if (ponkSyncService) {recorder.addStream('discover:///?stream=stimuli&name=PonkSync-Trainer', 'stimuli');}
+
+                    let ponkDataService = ResonanceApp.getService("PonkSync_Trainer");
+                    if (ponkDataService) {recorder.addStream('discover:///?stream=ponk_data&name=PonkSync_Trainer', 'ponk_data');}
 
                     //recorder.addStream('discover:///?stream=eeg&name=nvx136', 'eeg')
 

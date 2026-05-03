@@ -26,7 +26,7 @@ class StimuliControlPanel(QFrame):
     recordingStarted = pyqtSignal(str)
     recordingFinished = pyqtSignal()
 
-    def __init__(self, settings, resonance, parent=None):
+    def __init__(self, settings, resonance, output_stream=None, parent=None):
         super().__init__(parent)
         self.parent = parent
         # self.setObjectName("settings_panel")    # для привязки стиля
@@ -34,6 +34,7 @@ class StimuliControlPanel(QFrame):
 
         self.settings = settings.stimuli_settings
         self.resonance = resonance                      # для управления резонансными модулями
+        self.output_stream = output_stream
         self._service = self.resonance.getService("nvx136")     # Берем сервис                     
 
         self._init_state()
@@ -350,7 +351,9 @@ class StimuliControlPanel(QFrame):
 
     def _on_stimuli_order_changed(self, filename):
         message = {"stimulus": filename}
-        self.output_stream(json.dumps(message))
+        print(message)
+        if self.output_stream is not None:
+            self.output_stream(json.dumps(message))
 
     
     # === изменения звука === 

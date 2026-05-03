@@ -171,6 +171,7 @@ class StimuliPresentation_one_by_one(QWidget):
         if not os.path.exists(self._video_path):
             raise FileNotFoundError(f"Stimulus video not found: {self._video_path}")
 
+        self._current_stimulus_filename = filename
         self.media = self._instance.media_new(self._video_path)
         self._player.set_media(self.media)
         self.media.parse_async()
@@ -551,6 +552,7 @@ class StimuliPresentation_one_by_one(QWidget):
         self._player.stop()
         self._player.set_media(self.media)
         self._player.set_position(0)
+        self.stimulus.emit(self._current_stimulus_filename)
         self._player.play()
         self._schedule(self.LAST_FRAME_POLL_MS, lambda: self._capture_last_frame_loop(run_id, trial_id), run_id, trial_id)
 
