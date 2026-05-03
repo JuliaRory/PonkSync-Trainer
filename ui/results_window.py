@@ -226,7 +226,7 @@ def plot_error_distribution(
         ha="center",
         color="#FFFFFF" if transparent else "#3E2660",
         fontsize=PLOT_ANNOTATION_FONTSIZE,
-        arrowprops={"arrowstyle": "->", "color": "#A985F9" if transparent else "#4F2C7F", "linewidth": 1.8},
+        arrowprops={"arrowstyle": "->", "color": "#F0EDF7" if transparent else "#101AA5", "linewidth": 1.8},
     )
 
     ax.set_title(title, fontsize=PLOT_TITLE_FONTSIZE, color=text_color)
@@ -237,7 +237,7 @@ def plot_error_distribution(
     ax.tick_params(colors=text_color, labelsize=PLOT_TICK_FONTSIZE)
     for spine in ax.spines.values():
         spine.set_color(spine_color)
-    ax.grid(linewidth=0.5, color=grid_color, axis="x", alpha=0.65)
+    # ax.grid(linewidth=0.5, color=grid_color, axis="x", alpha=0.65)
     legend = ax.legend(loc="upper right", fontsize=PLOT_LEGEND_FONTSIZE)
     if legend is not None and transparent:
         legend.get_frame().set_alpha(0.15)
