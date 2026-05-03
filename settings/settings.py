@@ -28,10 +28,10 @@ class StimuliSettings:
     stimuli_n: int = 10
     stimuli_inf: bool = True
     saved_stimuli_filename: str = r"resources/saved_stimuli.json"
-    saved_stimuli_curr: str = "bar_60-20_SST_1"
+    saved_stimuli_curr: str = "bar_10-30_rest_vs_motor_1"
     sequence_mode: bool = False
     cross_ms: int = 1000
-    isi_min_s: float = 1.0
+    isi_min_s: float = 2.0
     isi_max_s: float = 3.0
     show_feedback: int = 0
     feedback_ms: int = 2000
