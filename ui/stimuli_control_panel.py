@@ -9,7 +9,13 @@ import numpy as np
 from utils.ui_helpers import create_button, create_spin_box, create_check_box, create_combo_box, create_shortcut, create_lineedit
 from utils.layout_utils import create_hbox, create_vbox
 
-from .results_window import ResultsWindow
+from .results_window import (
+    ResultsWindow,
+    calculate_error_statistics,
+    format_error_statistics,
+    prepare_results_df,
+    save_error_distribution_plot,
+)
 from .video_player import StimuliPresentation_one_by_one
 
 PLAY_LABEL = "▶"
@@ -47,6 +53,7 @@ class StimuliControlPanel(QFrame):
         self._restart_stimuli = False
         self._player_window = None
         self._results_windows = []
+        self._current_results_csv_path = None
 
     # =======================
     # =====     UI      =====
@@ -64,6 +71,8 @@ class StimuliControlPanel(QFrame):
         self.button_stimuli_pause = create_button(text=PLAY_LABEL, disabled=True, parent=self)
         self.button_stimuli_restart = create_button(text='start again', disabled=True, parent=self)
         self.button_show_results = create_button(text='show results', disabled=False, parent=self)
+        self.label_results_stats = QLabel("Результаты: --", self)
+        self.label_results_stats.setWordWrap(True)
 
         self.combo_box_stimuli = create_combo_box(self.settings.stimuli, curr_item_idx=self.settings.stimuli_curr, parent=self)
         self.combo_box_stimuli_type = create_combo_box(self.settings.stimuli_type, curr_item_idx=self.settings.stimuli_type_curr, parent=self)
@@ -120,6 +129,7 @@ class StimuliControlPanel(QFrame):
         
         layout = QVBoxLayout(self)
         layout.addWidget(self.button_show_results)
+        layout.addWidget(self.label_results_stats)
         layout.addLayout(layout_filename)
         layout.addLayout(layout_start)
         layout.addLayout(layout_stimuli)
@@ -148,6 +158,8 @@ class StimuliControlPanel(QFrame):
         self.button_stimuli_restart.clicked.connect(self._on_restart_stimuli_presentation)
         self.button_show_results.clicked.connect(self._on_show_results)
         self.check_box_stimuli_sequence_mode.stateChanged.connect(self._update_recording_mode_widgets)
+        self.line_edit_subject.textChanged.connect(self._update_results_stats)
+        self.line_edit_filename.textChanged.connect(self._update_results_stats)
 
     
     def _update_connections(self):
@@ -262,6 +274,7 @@ class StimuliControlPanel(QFrame):
         self.label_stimuli_idx.setText(f"")
         self.button_stimuli_pause.setText(PLAY_LABEL)
         self.button_stimuli_restart.setEnabled(False)
+        self._update_current_recording_stats()
 
 
     def _find_results_csv_path(self):
@@ -286,10 +299,82 @@ class StimuliControlPanel(QFrame):
             return None
         return max(matches, key=os.path.getmtime)
 
+    def _load_results_stats(self, csv_path=None):
+        df = self._load_results_df(csv_path)
+        if df is None:
+            return None
+        return calculate_error_statistics(df)
+
+    def _load_results_df(self, csv_path=None):
+        if csv_path is None:
+            csv_path = self._find_results_csv_path()
+        if csv_path is None or not os.path.exists(csv_path):
+            return None
+
+        try:
+            import pandas as pd
+
+            return prepare_results_df(pd.read_csv(csv_path))
+        except Exception as exc:
+            print(f"Could not load results from {csv_path}: {exc}")
+            return None
+
+    def _save_current_distribution_plot(self):
+        csv_path = self._current_results_csv_path if self._current_results_csv_path else self._find_results_csv_path()
+        df = self._load_results_df(csv_path)
+        if df is None:
+            return None
+
+        output_dir = os.path.dirname(os.path.abspath(csv_path)) if csv_path else os.path.abspath("data")
+        os.makedirs(output_dir, exist_ok=True)
+        output_path = os.path.join(output_dir, "_error_distribution.png")
+        try:
+            acceptable_limit = abs(self.settings.delay_limit[0]) if self.settings.delay_limit else 200
+            return save_error_distribution_plot(
+                df,
+                output_path,
+                acceptable_limit=acceptable_limit,
+                transparent=True,
+            )
+        except Exception as exc:
+            print(f"Could not save error distribution plot: {exc}")
+            return None
+
+    def _update_results_stats(self):
+        stats = self._load_results_stats()
+        self.label_results_stats.setText(format_error_statistics(stats) if stats is not None else "Результаты: --")
+
+    def _update_current_recording_stats(self):
+        stats = self._load_results_stats(self._current_results_csv_path)
+        self.label_results_stats.setText(format_error_statistics(stats) if stats is not None else "Результаты: --")
+
+    def get_current_results_stats(self):
+        stats = self._load_results_stats(self._current_results_csv_path)
+        if stats is None:
+            stats = self._load_results_stats()
+        return stats
+
+    def show_mean_error_on_player(self):
+        pw = getattr(self, "_player_window", None)
+        if isinstance(pw, QWidget) and not pw.isHidden() and pw.is_mean_error_visible():
+            pw.hide_mean_error()
+            return True
+
+        stats = self.get_current_results_stats()
+        if stats is None or stats.get("n", 0) <= 0 or not np.isfinite(stats.get("mean", np.nan)):
+            self.label_results_stats.setText("Результаты: --")
+            return False
+
+        self.label_results_stats.setText(format_error_statistics(stats))
+        if not isinstance(pw, QWidget) or pw.isHidden():
+            return False
+        pw.show_mean_error(stats["mean"], plot_path=self._save_current_distribution_plot())
+        return True
+
     def _get_results_limits(self):
         if not self.settings.delay_limit:
             return None
-        limit = max(abs(value) for value in self.settings.delay_limit)
+        limit = abs(self.settings.delay_limit[0])
         return (-limit, limit)
 
     def _on_show_results(self):
@@ -301,6 +386,8 @@ class StimuliControlPanel(QFrame):
                 "Could not find the CSV results file for the selected subject and record name.",
             )
             return
+
+        self._update_results_stats()
 
         results_window = ResultsWindow()
         self._results_windows.append(results_window)
@@ -340,6 +427,7 @@ class StimuliControlPanel(QFrame):
         full_path_csv = os.path.join(folder, filename_csv)
         if os.path.exists(full_path_csv):
             full_path_csv = full_path_csv[:-4] +"-$$$.csv"
+        self._current_results_csv_path = full_path_csv
         self.changeFile.emit(full_path_csv) # start csv file -> data processor
         # self.check_box_stimuli_record.setDisabled(True) # сделать недоступной возможность поменять статус записи nvx
 
@@ -425,6 +513,7 @@ class StimuliControlPanel(QFrame):
     def _finilize(self):
         # self._update_combo_box_stimuli()
         self._update_recording_mode_widgets()
+        self._update_results_stats()
         print('that is it')
     
 

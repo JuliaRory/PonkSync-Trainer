@@ -55,6 +55,20 @@
             "filename": "cross_image_white_photomark.png"
         }
     },
+    "bar_3-7_rest_vs_motor_INTRO":{
+        "set": {
+            "1": "animatedSingle1500_tms_0ms_nosounds_bar.mkv", 
+            "2": "rest1500_tms_0ms_bar.mkv",
+            "3": "audio_countdown_3.mkv"
+        },
+        "order": [
+            3,1,2,1,1,2,1,1,1,2,1
+        ],
+        "cross": {
+            "dur_ms": 3000,
+            "filename": "cross_image_white_photomark.png"
+        }
+    },
     "bar_60-20_SST_1": {
         "set": {
             "1": "animatedSingle1500_tms_0ms_nosounds_bar_continue.mkv", 

@@ -2,7 +2,7 @@ import pyqtgraph as pg
 import numpy as np
 from PyQt5.QtCore import Qt, QTimer, QObject, QThread, pyqtSignal
 from PyQt5.QtGui import QIcon
-from PyQt5.QtWidgets import QMainWindow, QWidget, QGridLayout, QPushButton, QLabel, QSpinBox, QDoubleSpinBox, QCheckBox, QVBoxLayout, QHBoxLayout, QFrame
+from PyQt5.QtWidgets import QMainWindow, QWidget, QGridLayout, QPushButton, QLabel, QSpinBox, QDoubleSpinBox, QCheckBox, QVBoxLayout, QHBoxLayout, QFrame, QMessageBox
 
 from numpy import diff, arange, array, full, sum, tile, newaxis, vstack, linspace, pi, sin
 
@@ -77,6 +77,7 @@ class MainWindow(QWidget):
         self._mep_window = None
         self._mep_panel = QFrame(self)
         self._button_mep_plots = create_button("MEP plots", parent=self._mep_panel, w=120)
+        self._button_show_mean_error = create_button("Show mean error", parent=self._mep_panel, w=140)
         self._label_mep_mean = QLabel("Mean MEP amp: -- mV", self._mep_panel)
     
     ## =======================
@@ -88,6 +89,7 @@ class MainWindow(QWidget):
         mep_layout = QVBoxLayout(self._mep_panel)
         mep_layout.setContentsMargins(0, 0, 0, 0)
         mep_layout.addWidget(self._button_mep_plots)
+        mep_layout.addWidget(self._button_show_mean_error)
         mep_layout.addWidget(self._label_mep_mean)
         
         layout.addWidget(self._scale_panel, 0, 0, 1, 1, alignment=Qt.AlignRight)
@@ -119,6 +121,7 @@ class MainWindow(QWidget):
         self._data_processor.mepEpochReady.connect(self._on_mep_epoch_ready)
         self._data_processor.mepRecordingFinished.connect(self._on_mep_recording_finished)
         self._button_mep_plots.clicked.connect(self._show_mep_window)
+        self._button_show_mean_error.clicked.connect(self._show_mean_error_on_video_player)
    
         self._data_processor.delayValues.connect(lambda delays: self._process_delays(delays))
 
@@ -130,6 +133,14 @@ class MainWindow(QWidget):
         self._mep_window.show()
         self._mep_window.raise_()
         self._mep_window.activateWindow()
+
+    def _show_mean_error_on_video_player(self):
+        if not self._stimuli_panel.show_mean_error_on_player():
+            QMessageBox.information(
+                self,
+                "Mean Error",
+                "Open the stimuli window and make sure a results CSV with detected errors exists.",
+            )
 
     def _on_mep_epoch_ready(self, mep):
         if self._mep_window is not None:

@@ -51,6 +51,7 @@ class StimuliPresentation_one_by_one(QWidget):
     VIDEO_READY_HIDE_MS = 300
     LAST_FRAME_CAPTURE_MS = 180
     LAST_FRAME_POLL_MS = 40
+    MARKER_STIMULUS = "audio_countdown_3.mkv"
     
     def __init__(self, settings=None):
         super().__init__()  
@@ -63,6 +64,8 @@ class StimuliPresentation_one_by_one(QWidget):
         self._awaiting_feedback_trial_id = None
         self._feedback_trial_id = None
         self._feedback_rendering_trial_id = None
+        self._marker_visible_during_current_video = False
+        self._video_playback_active = False
         self._last_frame_ready = False
         self._awaiting_first_frame = False
         self._last_frame_path = os.path.abspath(os.path.join("data", "_stimulus_last_frame.png"))
@@ -85,6 +88,10 @@ class StimuliPresentation_one_by_one(QWidget):
         self._saved_sequence_set = {}
         self._saved_sequence_cross_filename = None
         self._saved_sequence_cross_ms = None
+        self._showing_final_image = False
+        self._final_image_path = None
+        self._marker_visible_during_current_video = False
+        self._video_playback_active = False
         self.n = None
         self.apply_sequence_settings()
         self._awaiting_first_frame = False
@@ -144,9 +151,12 @@ class StimuliPresentation_one_by_one(QWidget):
             min_s, max_s = max_s, min_s
         if np.isclose(min_s, max_s):
             return int(round(min_s * 1000))
-        return int(round(np.random.uniform(min_s, max_s) * 1000))
+        isi = int(round(np.random.uniform(min_s, max_s) * 1000))
+        print("ISI: ", isi)
+        return isi
 
     def _apply_cross_settings(self):
+        self._showing_final_image = False
         self._cross_figure_path = os.path.join(r"resources\stimuli", self._current_cross_filename())
         self._cross_dur_ms = self._current_cross_duration_ms()
 
@@ -301,8 +311,172 @@ class StimuliPresentation_one_by_one(QWidget):
 
         QTimer.singleShot(delay_ms, guarded_callback)
 
+    def _pick_final_image_path(self):
+        final_dir = os.path.join("resources", "stimuli", "final_fig")
+        if not os.path.isdir(final_dir):
+            return None
+
+        allowed_ext = {".png", ".jpg", ".jpeg", ".bmp", ".webp"}
+        filenames = [
+            filename for filename in os.listdir(final_dir)
+            if os.path.splitext(filename)[1].lower() in allowed_ext
+        ]
+        if not filenames:
+            return None
+
+        filename = str(np.random.choice(filenames))
+        return os.path.join(final_dir, filename)
+
+    def _set_fullscreen_pixmap(self, label, pixmap):
+        label.setPixmap(pixmap.scaled(self.size(), Qt.IgnoreAspectRatio, Qt.SmoothTransformation))
+        label.setGeometry(self.rect())
+
+    def _configure_marker_widget(self):
+        self._marker_widget = QLabel(self)
+        self._marker_widget.setGeometry(max(0, self.width() - 80), 0, 80, 80)
+        self._marker_widget.setStyleSheet("background-color: white;")
+        self._marker_widget.show()
+        self._marker_widget.raise_()
+
+    def _configure_mean_error_label(self):
+        self._mean_error_label = QLabel(self)
+        self._mean_error_label.setAlignment(Qt.AlignCenter)
+        self._mean_error_label.setWordWrap(True)
+        self._mean_error_label.setStyleSheet(
+            "QLabel {"
+            "color: white;"
+            "background-color: rgba(0, 0, 0, 180);"
+            "font-size: 64px;"
+            "font-weight: 700;"
+            "padding: 18px;"
+            "border-radius: 8px;"
+            "}"
+        )
+        self._update_mean_error_label_geometry()
+        self._mean_error_label.hide()
+
+        self._results_plot_label = QLabel(self)
+        self._results_plot_label.setAlignment(Qt.AlignCenter)
+        self._results_plot_label.setStyleSheet(
+            "QLabel {"
+            "background-color: transparent;"
+            "padding: 0px;"
+            "border: none;"
+            "}"
+        )
+        self._results_plot_path = None
+        self._update_results_plot_label_geometry()
+        self._results_plot_label.hide()
+
+    def _update_mean_error_label_geometry(self):
+        if "_mean_error_label" not in self.__dict__:
+            return
+        width = int(self.width() * 0.82)
+        height = 130
+        x = int((self.width() - width) / 2)
+        y = int(self.height() * 0.18)
+        self._mean_error_label.setGeometry(x, y, width, height)
+
+    def _update_results_plot_label_geometry(self):
+        if "_results_plot_label" not in self.__dict__:
+            return
+        width = int(self.width() * 0.84)
+        height = int(self.height() * 0.52)
+        x = int((self.width() - width) / 2)
+        y = int(self.height() * 0.34)
+        self._results_plot_label.setGeometry(x, y, width, height)
+
+    def is_mean_error_visible(self):
+        return "_mean_error_label" in self.__dict__ and self._mean_error_label.isVisible()
+
+    def hide_mean_error(self):
+        if "_mean_error_label" in self.__dict__:
+            self._mean_error_label.hide()
+        if "_results_plot_label" in self.__dict__:
+            self._results_plot_label.hide()
+        self._results_plot_path = None
+
+    def show_mean_error(self, mean_error, plot_path=None, duration_ms=None):
+        if "_mean_error_label" not in self.__dict__:
+            return
+        if np.isfinite(mean_error):
+            text = f"Средняя ошибка: {mean_error:.2f} мс"
+        else:
+            text = "Средняя ошибка: --"
+        self._mean_error_label.setText(text)
+        self._update_mean_error_label_geometry()
+        self._mean_error_label.show()
+        self._mean_error_label.raise_()
+        if plot_path and os.path.exists(plot_path) and "_results_plot_label" in self.__dict__:
+            self._results_plot_path = plot_path
+            pixmap = QPixmap(plot_path)
+            if not pixmap.isNull():
+                self._update_results_plot_label_geometry()
+                self._results_plot_label.setPixmap(
+                    pixmap.scaled(
+                        self._results_plot_label.size(),
+                        Qt.KeepAspectRatio,
+                        Qt.SmoothTransformation,
+                    )
+                )
+                self._results_plot_label.show()
+                self._results_plot_label.raise_()
+        elif "_results_plot_label" in self.__dict__:
+            self._results_plot_path = None
+            self._results_plot_label.hide()
+        if "_marker_widget" in self.__dict__ and self._marker_widget.isVisible():
+            self._marker_widget.raise_()
+        if duration_ms and duration_ms > 0:
+            QTimer.singleShot(int(duration_ms), self.hide_mean_error)
+
+    def _show_marker(self):
+        if "_marker_widget" not in self.__dict__:
+            return
+        self._marker_widget.show()
+        self._marker_widget.raise_()
+
+    def _hide_marker(self):
+        if "_marker_widget" not in self.__dict__:
+            return
+        self._marker_widget.hide()
+
+    def _should_show_marker_for_stimulus(self, filename):
+        return os.path.basename(filename) == self.MARKER_STIMULUS
+
+    def _attach_video_output(self):
+        if getattr(self, "_video_output_attached", False):
+            return
+        self._player.set_hwnd(self._video_hwnd)
+        self._video_output_attached = True
+
+    def _detach_video_output(self):
+        if not getattr(self, "_video_output_attached", False):
+            return
+        try:
+            self._player.set_hwnd(0)
+        finally:
+            self._video_output_attached = False
+
+    def _show_final_image(self):
+        self._detach_video_output()
+        self._video_widget.hide()
+        self._final_image_path = self._pick_final_image_path()
+        self._showing_final_image = bool(self._final_image_path)
+
+        if self._showing_final_image:
+            pixmap = QPixmap(self._final_image_path)
+            if not pixmap.isNull():
+                self._set_fullscreen_pixmap(self._cross_label, pixmap)
+
+        self._hide_feedback_bar_mode()
+        self._stacked.setCurrentIndex(2)
+        self._cross_label.show()
+        self._show_marker()
+
     def _finish_sequence(self):
         self._player.stop()
+        self._video_playback_active = False
+        self._detach_video_output()
         self._awaiting_first_frame = False
         self._is_paused = False
         self._sequence_started = False
@@ -312,8 +486,7 @@ class StimuliPresentation_one_by_one(QWidget):
         self._feedback_trial_id = None
         self._feedback_rendering_trial_id = None
         self._finished = True
-        self._stacked.setCurrentIndex(2)
-        self._cross_label.show()
+        self._show_final_image()
         self.stimuliFinished.emit()
 
     def _configure_player(self):
@@ -321,6 +494,7 @@ class StimuliPresentation_one_by_one(QWidget):
         self._instance = vlc.Instance(
             '--file-caching=100',
             '--no-video-title-show',
+            '--no-osd',
             '--quiet',
             '--no-sub-autodetect-file', 
             '--no-spu'
@@ -351,6 +525,8 @@ class StimuliPresentation_one_by_one(QWidget):
 
         # === setup layout === 
         self._setup_layout()
+        self._configure_marker_widget()
+        self._configure_mean_error_label()
 
         # === Установить видос === 
         self.set_video_path()
@@ -372,6 +548,7 @@ class StimuliPresentation_one_by_one(QWidget):
         self._stacked.raise_()
 
         self._stacked.setCurrentIndex(2)
+        self._video_widget.hide()
 
     def _configure_background_label(self):
         background_path = os.path.join(r"resources\stimuli", self.settings.background_figure)
@@ -403,17 +580,13 @@ class StimuliPresentation_one_by_one(QWidget):
         self._video_placeholder.hide()
         self._video_placeholder.raise_()
 
-        self._last_frame_label = QLabel(self)
-        self._last_frame_label.setGeometry(self.rect())
-        self._last_frame_label.setAlignment(Qt.AlignCenter)
-        self._last_frame_label.setStyleSheet("background-color: black;")
-        self._last_frame_label.hide()
         # layout = QVBoxLayout(self)
         # layout.setContentsMargins(0,0,0,0)
         # layout.addWidget(self._video_widget)
 
-        winid = int(self._video_widget.winId())
-        self._player.set_hwnd(winid)
+        self._video_hwnd = int(self._video_widget.winId())
+        self._video_output_attached = False
+        self._attach_video_output()
 
 
     def _configure_cross_label(self):
@@ -445,6 +618,13 @@ class StimuliPresentation_one_by_one(QWidget):
     def _configure_feedback_widget(self):
         self._feedback_widget = QWidget(self)
         self._feedback_widget.setStyleSheet("background:transparent;")
+
+        self._last_frame_label = QLabel(self._feedback_widget)
+        self._last_frame_label.setGeometry(self._feedback_widget.rect())
+        self._last_frame_label.setAlignment(Qt.AlignCenter)
+        self._last_frame_label.setStyleSheet("background-color: black;")
+        self._last_frame_label.hide()
+        self._last_frame_label.lower()
 
         w, h = self.settings.feedback_w, self.settings.feedback_h
 
@@ -486,32 +666,65 @@ class StimuliPresentation_one_by_one(QWidget):
         stimuli_mode = self.settings.stimuli[self.settings.stimuli_curr]
         # self.logger.info(f"Stimuli mode: {stimuli_mode}")
 
-    def _show_feedback_plot_mode(self):
-        self._background_label.show()
-        self._background_label.lower()
-        self._last_frame_label.hide()
-        self._feedback_bar.hide()
-        self.change_stimuli()
-
-    def _show_feedback_bar_mode(self):
-        self._background_label.hide()
+    def _hide_feedback_plot_widgets(self):
         self._feedback_graph.hide()
         for graph in self._feedback_graphs:
             graph.hide()
+
+    def _clear_last_frame_background(self, remove_file=False):
+        if hasattr(self, "_last_frame_label"):
+            self._last_frame_label.clear()
+            self._last_frame_label.hide()
+        if remove_file and os.path.exists(self._last_frame_path):
+            try:
+                os.remove(self._last_frame_path)
+            except OSError:
+                pass
+
+    def _show_last_frame_background(self):
+        if not self._last_frame_ready or not os.path.exists(self._last_frame_path):
+            return False
+
+        pixmap = QPixmap(self._last_frame_path)
+        if pixmap.isNull():
+            return False
+
+        target_size = self._feedback_widget.size() if hasattr(self, "_feedback_widget") else self.size()
+        self._last_frame_label.setPixmap(
+            pixmap.scaled(target_size, Qt.IgnoreAspectRatio, Qt.SmoothTransformation)
+        )
+        self._last_frame_label.setGeometry(self._feedback_widget.rect())
+        self._last_frame_label.show()
+        self._last_frame_label.lower()
+        if hasattr(self, "_background_label"):
+            self._background_label.hide()
+            self._background_label.lower()
+        return True
+
+    def _show_feedback_plot_mode(self):
+        self._video_widget.hide()
+        self._background_label.hide()
+        self._background_label.lower()
+        self._show_last_frame_background()
+        self._feedback_bar.hide()
         if hasattr(self, "_video_placeholder"):
             self._video_placeholder.hide()
-        self._stacked.setCurrentIndex(0)
-        if self._last_frame_ready and os.path.exists(self._last_frame_path):
-            pixmap = QPixmap(self._last_frame_path)
-            if not pixmap.isNull():
-                self._last_frame_label.setPixmap(pixmap.scaled(self.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation))
-                self._last_frame_label.setGeometry(self.rect())
-                self._last_frame_label.show()
-                self._last_frame_label.raise_()
+        self.change_stimuli()
+        self._show_marker()
+
+    def _show_feedback_bar_mode(self):
+        self._video_widget.hide()
+        self._background_label.hide()
+        self._hide_feedback_plot_widgets()
+        if hasattr(self, "_video_placeholder"):
+            self._video_placeholder.hide()
+        self._show_last_frame_background()
+        self._stacked.setCurrentIndex(1)
         self._feedback_bar.setFixedSize(self.size())
         self._feedback_bar.move(0, 0)
         self._feedback_bar.show()
         self._feedback_bar.raise_()
+        self._show_marker()
         self._feedback_bar.update()
     
     # ===============================
@@ -523,6 +736,7 @@ class StimuliPresentation_one_by_one(QWidget):
             print('[VLC player]: stimuli presentation has been stopped.')
             return
         run_id = self._run_id
+        self._showing_final_image = False
         
         if self.n is not None and self._counter >= self.n:
             self._finish_sequence()
@@ -536,16 +750,22 @@ class StimuliPresentation_one_by_one(QWidget):
         self._active_trial_id += 1
         trial_id = self._active_trial_id
         self.show_delay = False
+        self._last_frame_ready = False
+        self._clear_last_frame_background(remove_file=True)
         self._awaiting_feedback = False
         self._awaiting_feedback_trial_id = None
         self._feedback_trial_id = None
         self._feedback_rendering_trial_id = None
 
         # запустить следующее видео
+        self._marker_visible_during_current_video = self._should_show_marker_for_stimulus(self._current_stimulus_filename)
+        self._attach_video_output()
+        self._video_widget.show()
         self._video_placeholder.setPixmap(self._main_cross_pic)
         self._video_placeholder.setGeometry(self.rect())
         self._video_placeholder.show()
         self._video_placeholder.raise_()
+        self._show_marker()
 
         self._stacked.setCurrentIndex(0)
         self._awaiting_first_frame = True
@@ -553,12 +773,17 @@ class StimuliPresentation_one_by_one(QWidget):
         self._player.set_media(self.media)
         self._player.set_position(0)
         self.stimulus.emit(self._current_stimulus_filename)
+        self._video_playback_active = True
         self._player.play()
         self._schedule(self.LAST_FRAME_POLL_MS, lambda: self._capture_last_frame_loop(run_id, trial_id), run_id, trial_id)
 
         self._background_label.hide()
         self._hide_feedback_bar_mode()
         self._cross_label.hide()
+        if self._marker_visible_during_current_video:
+            self._show_marker()
+        else:
+            self._hide_marker()
         
 
         # подготовить следующее видео
@@ -573,15 +798,21 @@ class StimuliPresentation_one_by_one(QWidget):
         # Проверяем окончание видео каждые 50ms
 
     def _show_video_widget(self):
-        if self._stopped:
+        if self._stopped or not self._video_playback_active or not self._awaiting_first_frame:
             return
+        self._clear_last_frame_background()
+        self._video_widget.show()
         self._stacked.setCurrentIndex(0)
         if hasattr(self, "_video_placeholder"):
             self._video_placeholder.hide()
+        if self._marker_visible_during_current_video:
+            self._show_marker()
+        else:
+            self._hide_marker()
         self._awaiting_first_frame = False
 
     def _capture_last_frame_loop(self, run_id, trial_id):
-        if self._last_frame_ready or not self._current_trial(run_id, trial_id):
+        if self._last_frame_ready or not self._video_playback_active or not self._current_trial(run_id, trial_id):
             return
 
         length = self._player.get_length()
@@ -600,12 +831,24 @@ class StimuliPresentation_one_by_one(QWidget):
         if not self._current_trial(run_id, trial_id):
             return  # больше ничего не делаем
         self._awaiting_first_frame = False
+        self._video_playback_active = False
+        if not self._last_frame_ready:
+            os.makedirs(os.path.dirname(self._last_frame_path), exist_ok=True)
+            if self._player.video_take_snapshot(0, self._last_frame_path, self.width(), self.height()) == 0:
+                self._last_frame_ready = True
+        self._player.stop()
+        self._detach_video_output()
+        self._video_widget.hide()
+        self._hide_feedback_plot_widgets()
         if hasattr(self, "_video_placeholder"):
             self._video_placeholder.hide()
-        self._stacked.setCurrentIndex(0)
+        self._stacked.setCurrentIndex(2)
+        self._cross_label.show()
+        # self._cross_label.show()
         
             # Сразу показываем placeholder перед следующим видео
             
+        self._show_marker()
         self._awaiting_feedback = True
         self._awaiting_feedback_trial_id = trial_id
         self.stimuliEnded.emit()    # --> stimuli_control_panel --> main_window --> data_processor
@@ -627,7 +870,7 @@ class StimuliPresentation_one_by_one(QWidget):
             )
 
     def _show_cross_if_no_feedback(self, run_id=None, trial_id=None):
-        print("waiting")
+        print("waiting feedback")
         run_id = self._run_id if run_id is None else run_id
         trial_id = self._active_trial_id if trial_id is None else trial_id
         if not self._current_trial(run_id, trial_id) or self._is_paused:
@@ -666,7 +909,7 @@ class StimuliPresentation_one_by_one(QWidget):
     def _hide_feedback_bar_mode(self):
         self._background_label.hide()
         self._feedback_bar.hide()
-        self._last_frame_label.hide()
+        self._clear_last_frame_background()
 
     def _check_feedback(self):
         trial_id = self._feedback_trial_id
@@ -714,11 +957,14 @@ class StimuliPresentation_one_by_one(QWidget):
             return
         run_id = self._run_id
         trial_id = self._active_trial_id
+        self._video_widget.hide()
         if hasattr(self, "_video_placeholder"):
             self._video_placeholder.hide()
         self._hide_feedback_bar_mode()
+        self._hide_feedback_plot_widgets()
         self._stacked.setCurrentIndex(2)
         self._cross_label.show()
+        self._show_marker()
         if not self._is_paused:
             self._cross_dur_ms = self._next_cross_duration_ms()
             self._schedule(self._cross_dur_ms, self._play_next_video, run_id, trial_id)
@@ -789,10 +1035,15 @@ class StimuliPresentation_one_by_one(QWidget):
             self._background_label.setGeometry(self.rect())
 
         if hasattr(self, "_cross_label"):
-            self._main_cross_pic = QPixmap(self._cross_figure_path).scaled(
-                self.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation
-            )
-            self._cross_label.setPixmap(self._main_cross_pic)
+            if self._showing_final_image and self._final_image_path:
+                pixmap = QPixmap(self._final_image_path)
+                if not pixmap.isNull():
+                    self._set_fullscreen_pixmap(self._cross_label, pixmap)
+            else:
+                self._main_cross_pic = QPixmap(self._cross_figure_path).scaled(
+                    self.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation
+                )
+                self._cross_label.setPixmap(self._main_cross_pic)
             self._cross_label.setGeometry(self.rect())
 
         if hasattr(self, "_video_placeholder"):
@@ -800,11 +1051,38 @@ class StimuliPresentation_one_by_one(QWidget):
             self._video_placeholder.setGeometry(self.rect())
 
         if hasattr(self, "_last_frame_label"):
-            self._last_frame_label.setGeometry(self.rect())
+            self._last_frame_label.setGeometry(self._feedback_widget.rect())
+            if self._last_frame_label.isVisible():
+                self._show_last_frame_background()
 
         if hasattr(self, "_feedback_bar"):
             self._feedback_bar.setFixedSize(self.size())
             self._feedback_bar.move(0, 0)
+
+        if "_marker_widget" in self.__dict__:
+            self._marker_widget.setGeometry(max(0, self.width() - 80), 0, 80, 80)
+            self._marker_widget.raise_()
+
+        self._update_mean_error_label_geometry()
+        self._update_results_plot_label_geometry()
+        if (
+            "_results_plot_label" in self.__dict__
+            and self._results_plot_label.isVisible()
+            and self._results_plot_path
+            and os.path.exists(self._results_plot_path)
+        ):
+            pixmap = QPixmap(self._results_plot_path)
+            if not pixmap.isNull():
+                self._results_plot_label.setPixmap(
+                    pixmap.scaled(
+                        self._results_plot_label.size(),
+                        Qt.KeepAspectRatio,
+                        Qt.SmoothTransformation,
+                    )
+                )
+                self._results_plot_label.raise_()
+        if "_mean_error_label" in self.__dict__ and self._mean_error_label.isVisible():
+            self._mean_error_label.raise_()
     
 
     # === показ стимулов ===
@@ -849,6 +1127,8 @@ class StimuliPresentation_one_by_one(QWidget):
         print("[VLC player]: restart stimuli presentation.")
         self._run_id += 1
         self._player.stop()
+        self._video_playback_active = False
+        self._detach_video_output()
 
         self._is_paused = False
         self._sequence_started = False
@@ -856,6 +1136,8 @@ class StimuliPresentation_one_by_one(QWidget):
         self._finished = False
         self._counter = 0
         self._active_trial_id = 0
+        self._showing_final_image = False
+        self._final_image_path = None
         self.show_delay = False
         self._awaiting_feedback = False
         self._awaiting_feedback_trial_id = None
@@ -865,8 +1147,11 @@ class StimuliPresentation_one_by_one(QWidget):
 
         self._current_index = 0
         self.currIdxChanged.emit(self._current_index)
+        self._video_widget.hide()
         self._stacked.setCurrentIndex(2)
         self._cross_label.show()
+        self.hide_mean_error()
+        self._show_marker()
     
     def finish(self):
         print("[VLC player]: finish the stimuli presentation and close the player.")
@@ -877,6 +1162,8 @@ class StimuliPresentation_one_by_one(QWidget):
         self._feedback_rendering_trial_id = None
         self._stopped = True           # ставим флаг остановки
         self._player.stop()
+        self._video_playback_active = False
+        self._detach_video_output()
         self._player.release()
         self._instance.release()
         if not self._finished:
@@ -898,7 +1185,7 @@ class StimuliPresentation_one_by_one(QWidget):
         self._mediaPlaying.emit(self._run_id, self._active_trial_id)
 
     def _handle_media_playing(self, run_id, trial_id):
-        if not self._current_trial(run_id, trial_id) or not self._awaiting_first_frame:
+        if not self._video_playback_active or not self._current_trial(run_id, trial_id) or not self._awaiting_first_frame:
             return
         self._schedule(self.VIDEO_READY_HIDE_MS, self._show_video_widget, run_id, trial_id)
 
