@@ -552,7 +552,7 @@ class StimuliPresentation_one_by_one(QWidget):
         self._stacked.raise_()
 
         self._stacked.setCurrentIndex(2)
-        self._video_widget.hide()
+        # self._video_widget.hide()
 
     def _configure_background_label(self):
         background_path = os.path.join(r"resources\stimuli", self.settings.background_figure)
@@ -573,9 +573,9 @@ class StimuliPresentation_one_by_one(QWidget):
         video_placeholder_pixmap = QPixmap(self._cross_figure_path).scaled(
                 self.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation
             )
-        self._video_placeholder = QLabel(self._video_widget)
+        self._video_placeholder = QLabel(self)
         self._video_placeholder.setPixmap(video_placeholder_pixmap)
-        self._video_placeholder.setGeometry(self._video_widget.rect())
+        self._video_placeholder.setGeometry(self.rect())
         self._video_placeholder.setAlignment(Qt.AlignCenter)
         self._video_placeholder.setAttribute(Qt.WA_TransparentForMouseEvents, True)
         self._video_placeholder.setStyleSheet("background-color: black;")
@@ -584,8 +584,8 @@ class StimuliPresentation_one_by_one(QWidget):
         self._video_placeholder.hide()
         self._video_placeholder.raise_()
 
-        self._last_frame_label = QLabel(self._video_widget)
-        self._last_frame_label.setGeometry(self._video_widget.rect())
+        self._last_frame_label = QLabel(self)
+        self._last_frame_label.setGeometry(self.rect())
         self._last_frame_label.setAlignment(Qt.AlignCenter)
         self._last_frame_label.setStyleSheet("background-color: black;")
         self._last_frame_label.hide()
@@ -722,7 +722,7 @@ class StimuliPresentation_one_by_one(QWidget):
         return True
 
     def _show_feedback_plot_mode(self):
-        self._video_widget.hide()
+        #self._video_widget.hide()
         self._background_label.show()
         self._background_label.lower()
         self._last_frame_label.hide()
@@ -970,7 +970,9 @@ class StimuliPresentation_one_by_one(QWidget):
     def _hide_feedback_bar_mode(self):
         self._background_label.hide()
         self._feedback_bar.hide()
-        self._clear_last_frame_background()
+        if hasattr(self, "_last_frame_label"):
+            self._last_frame_label.hide()
+        
 
     def _check_feedback(self):
         trial_id = self._feedback_trial_id
@@ -1018,7 +1020,7 @@ class StimuliPresentation_one_by_one(QWidget):
             return
         run_id = self._run_id
         trial_id = self._active_trial_id
-        self._video_widget.hide()
+        # self._video_widget.hide()
         if hasattr(self, "_video_placeholder"):
             self._video_placeholder.hide()
         self._hide_feedback_bar_mode()
@@ -1093,7 +1095,7 @@ class StimuliPresentation_one_by_one(QWidget):
                 self.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation
             )
             self._background_label.setPixmap(self._background)
-            self._last_frame_label.setGeometry(self._video_widget.rect())
+            self._last_frame_label.setGeometry(self.rect())
 
         if hasattr(self, "_cross_label"):
             if self._showing_final_image and self._final_image_path:
@@ -1109,7 +1111,7 @@ class StimuliPresentation_one_by_one(QWidget):
 
         if hasattr(self, "_video_placeholder"):
             self._video_placeholder.setPixmap(self._main_cross_pic)
-            self._video_placeholder.setGeometry(self._video_widget.rect())
+            self._video_placeholder.setGeometry(self.rect())
 
         if hasattr(self, "_last_frame_label"):
             self._last_frame_label.setGeometry(self.rect())
