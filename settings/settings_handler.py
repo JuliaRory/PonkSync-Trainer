@@ -78,6 +78,7 @@ class SettingsHandler:
         self._stimuli_panel.spin_box_limit1.valueChanged[int].connect(self._update_limit1)
         self._stimuli_panel.spin_box_limit2.valueChanged[int].connect(self._update_limit2)
         self._stimuli_panel.spin_box_limit3.valueChanged[int].connect(self._update_limit3)
+        self._stimuli_panel.line_edit_subject.textChanged.connect(self._update_subject)
         self._stimuli_panel.line_edit_filename.textChanged.connect(self._update_filename)
 
 
@@ -156,6 +157,9 @@ class SettingsHandler:
         self.settings.processing_settings.tkeo = status
 
     # === stimuli settings === 
+    def _update_subject(self, subject):
+        self.settings.stimuli_settings.subject = subject
+
     def _update_filename(self, filename):
         self.settings.stimuli_settings.filename = filename
 

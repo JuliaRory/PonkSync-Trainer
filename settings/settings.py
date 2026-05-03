@@ -90,6 +90,17 @@ class DetectionSettings:
     mov_detect_criterio: str = "max"
 
 
+@dataclass
+class MEPSettings:
+    n_plots: int = 10
+    epoch_start_ms: int = -100
+    epoch_end_ms: int = 300
+    plot_start_ms: int = -10
+    plot_end_ms: int = 100
+    amp_threshold_mv: float = 0.5
+    max_amp_mV: float = 5.0
+
+
 
 @dataclass
 class Settings:
@@ -101,6 +112,7 @@ class Settings:
     plot_settings: PlotSettings = field(default_factory=PlotSettings)
     processing_settings: ProcessingSettings = field(default_factory=ProcessingSettings)
     stimuli_settings: StimuliSettings = field(default_factory=StimuliSettings)
+    mep_settings: MEPSettings = field(default_factory=MEPSettings)
 
     activate_bat: bool = True
     bat_file: str = "D:\Resonance\dist_2025\control_ponk.bat"

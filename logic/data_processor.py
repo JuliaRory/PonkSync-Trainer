@@ -1,6 +1,8 @@
 from PyQt5.QtCore import pyqtSignal, QObject, pyqtSlot
 import numpy as np
 from collections import deque
+import os
+import h5py
 
 from scipy.signal import iirnotch, tf2sos, butter, sosfilt, sosfilt_zi
 
@@ -31,6 +33,8 @@ class DataProcessor(QObject):
     newDataProcessed = pyqtSignal()
     triggerIdx = pyqtSignal(int)
     peakIdx = pyqtSignal(int)
+    mepEpochReady = pyqtSignal(object)
+    mepRecordingFinished = pyqtSignal(float, int, str)
 
     delayValue = pyqtSignal(int)
     delayValues = pyqtSignal(object)    # --> main_window --> stimuli_panel --> video_player
@@ -50,6 +54,7 @@ class DataProcessor(QObject):
         zeros = [np.nan for _ in range(maxlen)]
         self.ts =  deque(np.arange(maxlen) * 1000 / self.settings.Fs, maxlen=maxlen)                             # стек с данными таймстемпов
         self.emg = deque(zeros, maxlen=maxlen)     # стек с данными EMG
+        self.mep_emg = deque(zeros, maxlen=maxlen)
         self.trigger = deque(zeros, maxlen=maxlen)     # стек с данными EMG
 
         self.timestamp = 0
@@ -61,6 +66,14 @@ class DataProcessor(QObject):
         self._feedback_cursor = 0
         self._pending_feedback_requests = 0
         self._feedback_counter = 0  # для показа N усреднённого фидбэка
+
+        self._pending_mep_triggers = []
+        self._mep_recording = False
+        self._mep_hdf_path = None
+        self._mep_record_epochs = []
+        self._mep_record_amps = []
+        self._mep_record_trigger_samples = []
+        self._mep_record_trigger_times = []
 
         self._coef = 1000 / self.settings.Fs
         self._ms_to_sample = lambda x: int(x / 1000 * self.settings.Fs)                                  # функция для пересчёта мс в сэмплы
@@ -82,6 +95,29 @@ class DataProcessor(QObject):
         self._pending_feedback_requests = 0
         self._trigger = None
 
+    def start_mep_recording(self, hdf_path):
+        self._mep_hdf_path = hdf_path
+        self._mep_record_epochs = []
+        self._mep_record_amps = []
+        self._mep_record_trigger_samples = []
+        self._mep_record_trigger_times = []
+        self._pending_mep_triggers = []
+        self._mep_recording = True
+
+    def finish_mep_recording(self):
+        if not self._mep_recording:
+            return
+
+        self._process_pending_mep_epochs(force=True)
+        self._mep_recording = False
+
+        amps = np.asarray(self._mep_record_amps, dtype=float)
+        finite_amps = amps[np.isfinite(amps)]
+        mean_amp = float(np.mean(finite_amps)) if finite_amps.size else np.nan
+        n_epochs = int(len(self._mep_record_epochs))
+        saved_path = self._save_mep_recording()
+        self.mepRecordingFinished.emit(mean_amp, n_epochs, saved_path or "")
+
     @pyqtSlot(object, float)
     def add_pack(self, pack, ts):
         """
@@ -95,12 +131,15 @@ class DataProcessor(QObject):
         
         self.res_timestamp = ts
         emg = self._process_new_pack(pack)
+        self.mep_emg.extend(self._last_mep_emg * 1E3)
         self.emg.extend(emg* 1E3)
 
         self.ts.extend(np.arange(self.timestamp, self.timestamp + emg.shape[0], 1) * self._coef)        # ms
         self.timestamp += emg.shape[0]  # idx
 
+        self._queue_mep_triggers_from_pack(pack)
         self._process_trigger(pack)
+        self._process_pending_mep_epochs()
 
         self.newDataProcessed.emit()        # --> plot_updater
         if self._trigger is not None:
@@ -288,6 +327,137 @@ class DataProcessor(QObject):
             self._trigger = self.ts[idx]       # для обработки поньков  [ms]
         
             
+    def _queue_mep_triggers_from_pack(self, pack):
+        ttl = np.array(pack[:, -1], dtype=np.uint8)
+        bit = self.settings.detection_settings.bit
+        trigger = ((ttl >> bit) & 0b1).astype(int)
+        trigger_diff = np.diff(trigger)
+        events = np.where(trigger_diff == 1)[0]
+
+        for event in events:
+            trigger_sample = self.timestamp - len(trigger) + int(event) + 1
+            trigger_time = trigger_sample * self._coef
+            self._pending_mep_triggers.append((trigger_sample, trigger_time))
+
+    def _process_pending_mep_epochs(self, force=False):
+        if not self._pending_mep_triggers:
+            return
+
+        processed = []
+        first_sample = self.timestamp - len(self.mep_emg)
+        emg = np.asarray(self.mep_emg, dtype=float)
+
+        for trigger_sample, trigger_time in self._pending_mep_triggers:
+            mep = self._try_extract_mep_epoch(trigger_sample, trigger_time, first_sample, emg, force=force)
+            if mep is None:
+                continue
+
+            processed.append((trigger_sample, trigger_time))
+            self.mepEpochReady.emit(mep)
+
+            if self._mep_recording:
+                self._mep_record_epochs.append(mep["epoch_mV"])
+                self._mep_record_amps.append(mep["amplitude_mV"])
+                self._mep_record_trigger_samples.append(trigger_sample)
+                self._mep_record_trigger_times.append(trigger_time)
+
+        if processed:
+            processed_set = set(processed)
+            self._pending_mep_triggers = [
+                item for item in self._pending_mep_triggers
+                if item not in processed_set
+            ]
+
+        if force:
+            self._pending_mep_triggers = []
+
+    def _try_extract_mep_epoch(self, trigger_sample, trigger_time, first_sample, emg, force=False):
+        s = self.settings.mep_settings
+        start_sample = trigger_sample + self._ms_to_sample(s.epoch_start_ms)
+        end_sample = trigger_sample + self._ms_to_sample(s.epoch_end_ms)
+
+        if self.timestamp <= end_sample and not force:
+            return None
+        if start_sample < first_sample:
+            return None
+        if end_sample > self.timestamp:
+            return None
+
+        start = int(start_sample - first_sample)
+        end = int(end_sample - first_sample)
+        epoch = np.asarray(emg[start:end], dtype=float)
+        if epoch.size == 0:
+            return None
+
+        time_ms = (np.arange(epoch.size) + self._ms_to_sample(s.epoch_start_ms)) * self._coef
+        amplitude = self._calculate_mep_amplitude(epoch, time_ms)
+
+        return {
+            "epoch_mV": epoch,
+            "time_ms": time_ms,
+            "amplitude_mV": amplitude,
+            "trigger_sample": int(trigger_sample),
+            "trigger_time_ms": float(trigger_time),
+        }
+
+    def _calculate_mep_amplitude(self, epoch, time_ms):
+        s = self.settings.mep_settings
+        mask = (time_ms >= s.plot_start_ms) & (time_ms <= s.plot_end_ms)
+        if not np.any(mask):
+            return np.nan
+        data = epoch[mask]
+        if data.size == 0 or not np.any(np.isfinite(data)):
+            return np.nan
+        return float(np.nanmax(data) - np.nanmin(data))
+
+    def _save_mep_recording(self):
+        if not self._mep_hdf_path or len(self._mep_record_epochs) == 0:
+            return self._mep_hdf_path
+
+        path = self._mep_hdf_path
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+
+        try:
+            return self._write_mep_hdf(path)
+        except OSError:
+            base, _ = os.path.splitext(path)
+            fallback_path = f"{base}_mep.hdf5"
+            return self._write_mep_hdf(fallback_path)
+
+    def _write_mep_hdf(self, path):
+        epochs = np.asarray(self._mep_record_epochs, dtype=np.float32)
+        amps = np.asarray(self._mep_record_amps, dtype=np.float32)
+        trigger_samples = np.asarray(self._mep_record_trigger_samples, dtype=np.int64)
+        trigger_times = np.asarray(self._mep_record_trigger_times, dtype=np.float64)
+        s = self.settings.mep_settings
+
+        with h5py.File(path, "a") as hdf:
+            if "mep" in hdf:
+                del hdf["mep"]
+            group = hdf.create_group("mep")
+            group.create_dataset("epochs_mV", data=epochs)
+            group.create_dataset("time_ms", data=self._mep_time_axis_for_record(), dtype=np.float32)
+            group.create_dataset("amplitudes_mV", data=amps)
+            group.create_dataset("trigger_samples", data=trigger_samples)
+            group.create_dataset("trigger_times_ms", data=trigger_times)
+            group.attrs["Fs"] = self.settings.Fs
+            group.attrs["epoch_start_ms"] = s.epoch_start_ms
+            group.attrs["epoch_end_ms"] = s.epoch_end_ms
+            group.attrs["plot_start_ms"] = s.plot_start_ms
+            group.attrs["plot_end_ms"] = s.plot_end_ms
+            group.attrs["amp_threshold_mV"] = s.amp_threshold_mv
+            finite_amps = amps[np.isfinite(amps)]
+            group.attrs["mean_amplitude_mV"] = float(np.mean(finite_amps)) if finite_amps.size else np.nan
+
+        return path
+
+    def _mep_time_axis_for_record(self):
+        if len(self._mep_record_epochs) == 0:
+            return np.asarray([], dtype=np.float32)
+        s = self.settings.mep_settings
+        n = len(self._mep_record_epochs[0])
+        return (np.arange(n) + self._ms_to_sample(s.epoch_start_ms)) * self._coef
+
     def _process_new_pack(self, pack):
         s = self.settings.processing_settings
 
@@ -303,6 +473,8 @@ class DataProcessor(QObject):
             emg = self.apply_notch(emg)
         if s.do_lowpass or s.do_highpass:
             emg = self.apply_butter(emg)
+
+        self._last_mep_emg = np.asarray(emg, dtype=float).copy()
 
         if s.tkeo:
             emg = self.calculate_TKEO(emg)

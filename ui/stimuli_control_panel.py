@@ -23,6 +23,8 @@ class StimuliControlPanel(QFrame):
     stimuliPresentation = pyqtSignal(bool)      # -> stimuli presentation is on
     stimuliEnded = pyqtSignal()
     changeFile = pyqtSignal(str)
+    recordingStarted = pyqtSignal(str)
+    recordingFinished = pyqtSignal()
 
     def __init__(self, settings, resonance, parent=None):
         super().__init__(parent)
@@ -190,6 +192,7 @@ class StimuliControlPanel(QFrame):
         if self.check_box_stimuli_record.isChecked():
             self.stimuliPresentation.emit(False)
             self._stop_nvx()
+            self.recordingFinished.emit()
         self.check_box_stimuli_record.setEnabled(True)
 
     # == show delay === 
@@ -298,6 +301,7 @@ class StimuliControlPanel(QFrame):
             if os.path.exists(full_path_hdf):
                 full_path_hdf = full_path_hdf[:-4] +"-$$$.hdf5"
             full_path_hdf = os.path.abspath(full_path_hdf)
+            self.recordingStarted.emit(full_path_hdf)
             self._start_nvx(full_path_hdf)
 
         filename_csv = filename + ".csv"

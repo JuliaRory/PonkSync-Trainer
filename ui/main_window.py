@@ -1,7 +1,8 @@
 import pyqtgraph as pg
+import numpy as np
 from PyQt5.QtCore import Qt, QTimer, QObject, QThread, pyqtSignal
 from PyQt5.QtGui import QIcon
-from PyQt5.QtWidgets import QMainWindow, QWidget, QGridLayout, QPushButton, QLabel, QSpinBox, QDoubleSpinBox, QCheckBox, QVBoxLayout, QHBoxLayout
+from PyQt5.QtWidgets import QMainWindow, QWidget, QGridLayout, QPushButton, QLabel, QSpinBox, QDoubleSpinBox, QCheckBox, QVBoxLayout, QHBoxLayout, QFrame
 
 from numpy import diff, arange, array, full, sum, tile, newaxis, vstack, linspace, pi, sin
 
@@ -22,6 +23,8 @@ from ui.scale_panel import ScalePanel
 from ui.filter_panel import FilterPanel
 from ui.peak_panel import PeakDetectionPanel
 from ui.stimuli_control_panel import StimuliControlPanel
+from ui.mep_panel import MEPPlotsWindow
+from utils.ui_helpers import create_button
 
 WIDTH_SET, HEIGHT_SET = 1400, 800
 
@@ -70,6 +73,10 @@ class MainWindow(QWidget):
         self._peak_panel = PeakDetectionPanel(self.settings, parent=self)
         self._figure_panel = OnlineGraph(self.settings, self._data_processor, parent=self)       # создать блок с графиками миограммы            --> self.plot_emg_graph
         self._stimuli_panel = StimuliControlPanel(self.settings, self._resonance, parent=self)
+        self._mep_window = None
+        self._mep_panel = QFrame(self)
+        self._button_mep_plots = create_button("MEP plots", parent=self._mep_panel, w=120)
+        self._label_mep_mean = QLabel("Mean MEP amp: -- mV", self._mep_panel)
     
     ## =======================
     ## === LAYOUT ===========
@@ -77,14 +84,19 @@ class MainWindow(QWidget):
 
     def _setup_layout(self):
         layout = QGridLayout(self)
+        mep_layout = QVBoxLayout(self._mep_panel)
+        mep_layout.setContentsMargins(0, 0, 0, 0)
+        mep_layout.addWidget(self._button_mep_plots)
+        mep_layout.addWidget(self._label_mep_mean)
         
         layout.addWidget(self._scale_panel, 0, 0, 1, 1, alignment=Qt.AlignRight)
         layout.addWidget(self._filter_panel, 1, 0, 1, 1, alignment=Qt.AlignRight)
         
-        layout.addWidget(self._figure_panel, 0, 1, 4, 3)
+        layout.addWidget(self._figure_panel, 0, 1, 5, 3)
         
-        layout.addWidget(self._peak_panel, 0, 4, 1, 2, alignment=Qt.AlignLeft)
-        layout.addWidget(self._stimuli_panel, 1, 4, 1, 2, alignment=Qt.AlignLeft)
+        layout.addWidget(self._mep_panel, 0, 4, 1, 2, alignment=Qt.AlignLeft)
+        layout.addWidget(self._peak_panel, 1, 4, 1, 2, alignment=Qt.AlignLeft)
+        layout.addWidget(self._stimuli_panel, 2, 4, 1, 2, alignment=Qt.AlignLeft)
 
         
     ## =======================
@@ -101,10 +113,41 @@ class MainWindow(QWidget):
         self._data_processor.delayValue[int].connect(lambda delay: self._process_delay(delay))
         self._stimuli_panel.stimuliEnded.connect(lambda: self._data_processor.get_delays())
         self._stimuli_panel.changeFile.connect(lambda fl: self._data_processor.change_file(fl))
+        self._stimuli_panel.recordingStarted.connect(self._on_mep_recording_started)
+        self._stimuli_panel.recordingFinished.connect(lambda: self._data_processor.finish_mep_recording())
+        self._data_processor.mepEpochReady.connect(self._on_mep_epoch_ready)
+        self._data_processor.mepRecordingFinished.connect(self._on_mep_recording_finished)
+        self._button_mep_plots.clicked.connect(self._show_mep_window)
    
         self._data_processor.delayValues.connect(lambda delays: self._process_delays(delays))
 
     # logic
+
+    def _show_mep_window(self):
+        if self._mep_window is None:
+            self._mep_window = MEPPlotsWindow(self.settings)
+        self._mep_window.show()
+        self._mep_window.raise_()
+        self._mep_window.activateWindow()
+
+    def _on_mep_epoch_ready(self, mep):
+        if self._mep_window is not None:
+            self._mep_window.add_mep(mep)
+
+    def _on_mep_recording_started(self, path):
+        self._label_mep_mean.setText("Mean MEP amp: -- mV")
+        if self._mep_window is not None:
+            self._mep_window.set_record_mean(np.nan, 0, path)
+        self._data_processor.start_mep_recording(path)
+
+    def _on_mep_recording_finished(self, mean_amp, n_epochs, saved_path):
+        if n_epochs <= 0 or not np.isfinite(mean_amp):
+            self._label_mep_mean.setText("Mean MEP amp: -- mV")
+        else:
+            self._label_mep_mean.setText(f"Mean MEP amp: {mean_amp:.2f} mV (n={n_epochs})")
+
+        if self._mep_window is not None:
+            self._mep_window.set_record_mean(mean_amp, n_epochs, saved_path)
 
     def _process_delay(self, delay):
         stimuli_settings = self.settings.stimuli_settings
