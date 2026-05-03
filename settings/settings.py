@@ -95,10 +95,12 @@ class MEPSettings:
     n_plots: int = 10
     epoch_start_ms: int = -100
     epoch_end_ms: int = 300
-    plot_start_ms: int = -10
-    plot_end_ms: int = 100
+    baseline_start_ms: int = -50
+    baseline_end_ms: int = -20
+    plot_start_ms: int = -20
+    plot_end_ms: int = 60
     amp_threshold_mv: float = 0.5
-    max_amp_mV: float = 5.0
+    max_amp_mV: float = 1.0
 
 
 

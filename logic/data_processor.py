@@ -72,6 +72,7 @@ class DataProcessor(QObject):
         self._mep_hdf_path = None
         self._mep_record_epochs = []
         self._mep_record_amps = []
+        self._mep_record_baselines = []
         self._mep_record_trigger_samples = []
         self._mep_record_trigger_times = []
 
@@ -99,6 +100,7 @@ class DataProcessor(QObject):
         self._mep_hdf_path = hdf_path
         self._mep_record_epochs = []
         self._mep_record_amps = []
+        self._mep_record_baselines = []
         self._mep_record_trigger_samples = []
         self._mep_record_trigger_times = []
         self._pending_mep_triggers = []
@@ -358,6 +360,7 @@ class DataProcessor(QObject):
             if self._mep_recording:
                 self._mep_record_epochs.append(mep["epoch_mV"])
                 self._mep_record_amps.append(mep["amplitude_mV"])
+                self._mep_record_baselines.append(mep["baseline_mV"])
                 self._mep_record_trigger_samples.append(trigger_sample)
                 self._mep_record_trigger_times.append(trigger_time)
 
@@ -390,15 +393,29 @@ class DataProcessor(QObject):
             return None
 
         time_ms = (np.arange(epoch.size) + self._ms_to_sample(s.epoch_start_ms)) * self._coef
+        baseline = self._calculate_mep_baseline(epoch, time_ms)
+        if np.isfinite(baseline):
+            epoch = epoch - baseline
         amplitude = self._calculate_mep_amplitude(epoch, time_ms)
 
         return {
             "epoch_mV": epoch,
             "time_ms": time_ms,
             "amplitude_mV": amplitude,
+            "baseline_mV": baseline,
             "trigger_sample": int(trigger_sample),
             "trigger_time_ms": float(trigger_time),
         }
+
+    def _calculate_mep_baseline(self, epoch, time_ms):
+        s = self.settings.mep_settings
+        mask = (time_ms >= s.baseline_start_ms) & (time_ms <= s.baseline_end_ms)
+        if not np.any(mask):
+            return np.nan
+        data = epoch[mask]
+        if data.size == 0 or not np.any(np.isfinite(data)):
+            return np.nan
+        return float(np.nanmean(data))
 
     def _calculate_mep_amplitude(self, epoch, time_ms):
         s = self.settings.mep_settings
@@ -427,6 +444,7 @@ class DataProcessor(QObject):
     def _write_mep_hdf(self, path):
         epochs = np.asarray(self._mep_record_epochs, dtype=np.float32)
         amps = np.asarray(self._mep_record_amps, dtype=np.float32)
+        baselines = np.asarray(self._mep_record_baselines, dtype=np.float32)
         trigger_samples = np.asarray(self._mep_record_trigger_samples, dtype=np.int64)
         trigger_times = np.asarray(self._mep_record_trigger_times, dtype=np.float64)
         s = self.settings.mep_settings
@@ -438,11 +456,14 @@ class DataProcessor(QObject):
             group.create_dataset("epochs_mV", data=epochs)
             group.create_dataset("time_ms", data=self._mep_time_axis_for_record(), dtype=np.float32)
             group.create_dataset("amplitudes_mV", data=amps)
+            group.create_dataset("baselines_mV", data=baselines)
             group.create_dataset("trigger_samples", data=trigger_samples)
             group.create_dataset("trigger_times_ms", data=trigger_times)
             group.attrs["Fs"] = self.settings.Fs
             group.attrs["epoch_start_ms"] = s.epoch_start_ms
             group.attrs["epoch_end_ms"] = s.epoch_end_ms
+            group.attrs["baseline_start_ms"] = s.baseline_start_ms
+            group.attrs["baseline_end_ms"] = s.baseline_end_ms
             group.attrs["plot_start_ms"] = s.plot_start_ms
             group.attrs["plot_end_ms"] = s.plot_end_ms
             group.attrs["amp_threshold_mV"] = s.amp_threshold_mv

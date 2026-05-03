@@ -39,6 +39,8 @@ class MEPPlotsWindow(QWidget):
         self.spin_n_plots = create_spin_box(1, 20, self.settings.n_plots, parent=self._controls, w=60)
         self.spin_epoch_start = create_spin_box(-1000, 0, self.settings.epoch_start_ms, parent=self._controls, w=70)
         self.spin_epoch_end = create_spin_box(1, 2000, self.settings.epoch_end_ms, parent=self._controls, w=70)
+        self.spin_baseline_start = create_spin_box(-1000, 1000, self.settings.baseline_start_ms, parent=self._controls, w=70)
+        self.spin_baseline_end = create_spin_box(-1000, 1000, self.settings.baseline_end_ms, parent=self._controls, w=70)
         self.spin_plot_start = create_spin_box(-1000, 1000, self.settings.plot_start_ms, parent=self._controls, w=70)
         self.spin_plot_end = create_spin_box(-1000, 2000, self.settings.plot_end_ms, parent=self._controls, w=70)
         self.spin_amp_thr = create_spin_box(
@@ -74,6 +76,7 @@ class MEPPlotsWindow(QWidget):
         controls_layout = QVBoxLayout(self._controls)
         controls_layout.addLayout(create_hbox([QLabel("N:"), self.spin_n_plots]))
         controls_layout.addLayout(create_hbox([QLabel("Epoch:"), self.spin_epoch_start, QLabel("to"), self.spin_epoch_end, QLabel("ms")]))
+        controls_layout.addLayout(create_hbox([QLabel("Baseline:"), self.spin_baseline_start, QLabel("to"), self.spin_baseline_end, QLabel("ms")]))
         controls_layout.addLayout(create_hbox([QLabel("Plot:"), self.spin_plot_start, QLabel("to"), self.spin_plot_end, QLabel("ms")]))
         controls_layout.addLayout(create_hbox([QLabel("Amp thr:"), self.spin_amp_thr, QLabel("mV")]))
         controls_layout.addLayout(create_hbox([QLabel("Y max:"), self.spin_ymax, QLabel("mV")]))
@@ -94,6 +97,8 @@ class MEPPlotsWindow(QWidget):
         self.settings.n_plots = int(self.spin_n_plots.value())
         self.settings.epoch_start_ms = int(self.spin_epoch_start.value())
         self.settings.epoch_end_ms = int(self.spin_epoch_end.value())
+        self.settings.baseline_start_ms = int(self.spin_baseline_start.value())
+        self.settings.baseline_end_ms = int(self.spin_baseline_end.value())
         self.settings.plot_start_ms = int(self.spin_plot_start.value())
         self.settings.plot_end_ms = int(self.spin_plot_end.value())
         self.settings.amp_threshold_mv = float(self.spin_amp_thr.value())
@@ -105,6 +110,9 @@ class MEPPlotsWindow(QWidget):
         if self.settings.plot_start_ms >= self.settings.plot_end_ms:
             self.settings.plot_end_ms = self.settings.plot_start_ms + 1
             self.spin_plot_end.setValue(self.settings.plot_end_ms)
+        if self.settings.baseline_start_ms >= self.settings.baseline_end_ms:
+            self.settings.baseline_end_ms = self.settings.baseline_start_ms + 1
+            self.spin_baseline_end.setValue(self.settings.baseline_end_ms)
 
         old_epochs = list(self._epochs)[: self.settings.n_plots]
         old_amps = list(self._amps)[: self.settings.n_plots]
@@ -186,4 +194,3 @@ class MEPPlotsWindow(QWidget):
         amps = np.asarray(list(self._amps), dtype=float)
         count = int(np.sum(amps[np.isfinite(amps)] > self.settings.amp_threshold_mv))
         self.label_above_thr.setText(f"Above {self.settings.amp_threshold_mv:.2f} mV: {count}/{self.settings.n_plots}")
-
