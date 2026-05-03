@@ -48,7 +48,7 @@ class StimuliPresentation_one_by_one(QWidget):
     stimulus = pyqtSignal(str)
     BAR_FEEDBACK_MS = 2000
     FEEDBACK_WAIT_MS = 400
-    VIDEO_READY_HIDE_MS = 300
+    VIDEO_READY_HIDE_MS = 500
     LAST_FRAME_CAPTURE_MS = 180
     LAST_FRAME_POLL_MS = 40
     MARKER_STIMULUS = "audio_countdown_3.mkv"
@@ -498,8 +498,11 @@ class StimuliPresentation_one_by_one(QWidget):
             '--no-osd',
             '--quiet',
             '--no-sub-autodetect-file', 
-            '--no-spu'
+            '--no-spu', 
+            '--no-embedded-video'
             )
+
+
         self._player = self._instance.media_player_new()
 
         # Привязка событий
@@ -570,9 +573,9 @@ class StimuliPresentation_one_by_one(QWidget):
         video_placeholder_pixmap = QPixmap(self._cross_figure_path).scaled(
                 self.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation
             )
-        self._video_placeholder = QLabel(self)
+        self._video_placeholder = QLabel(self._video_widget)
         self._video_placeholder.setPixmap(video_placeholder_pixmap)
-        self._video_placeholder.setGeometry(self.rect())
+        self._video_placeholder.setGeometry(self._video_widget.rect())
         self._video_placeholder.setAlignment(Qt.AlignCenter)
         self._video_placeholder.setAttribute(Qt.WA_TransparentForMouseEvents, True)
         self._video_placeholder.setStyleSheet("background-color: black;")
@@ -581,8 +584,8 @@ class StimuliPresentation_one_by_one(QWidget):
         self._video_placeholder.hide()
         self._video_placeholder.raise_()
 
-        self._last_frame_label = QLabel(self)
-        self._last_frame_label.setGeometry(self.rect())
+        self._last_frame_label = QLabel(self._video_widget)
+        self._last_frame_label.setGeometry(self._video_widget.rect())
         self._last_frame_label.setAlignment(Qt.AlignCenter)
         self._last_frame_label.setStyleSheet("background-color: black;")
         self._last_frame_label.hide()
@@ -672,6 +675,7 @@ class StimuliPresentation_one_by_one(QWidget):
             graph.hide()
 
     def _clear_last_frame_background(self, remove_file=False):
+        self._last_frame_ready = False
         self._last_frame_pixmap = QPixmap()
         if hasattr(self, "_last_frame_label"):
             self._last_frame_label.clear()
@@ -841,26 +845,59 @@ class StimuliPresentation_one_by_one(QWidget):
             self._hide_marker()
         self._awaiting_first_frame = False
 
+    # def _capture_last_frame_loop(self, run_id, trial_id):
+    #     if self._last_frame_ready or not self._video_playback_active or not self._current_trial(run_id, trial_id):
+    #         return
+
+    #     length = self._player.get_length()
+    #     current = self._player.get_time()
+    #     if length > 0 and current >= 0 and 0 <= length - current <= self.LAST_FRAME_CAPTURE_MS:
+    #         os.makedirs(os.path.dirname(self._last_frame_path), exist_ok=True)
+    #         if self._player.video_take_snapshot(0, self._last_frame_path, self.width(), self.height()) == 0:
+    #             self._last_frame_pixmap = QPixmap(self._last_frame_path)
+    #             self._last_frame_ready = True
+    #         return
+
+    #     self._schedule(self.LAST_FRAME_POLL_MS, lambda: self._capture_last_frame_loop(run_id, trial_id), run_id, trial_id)
+
     def _capture_last_frame_loop(self, run_id, trial_id):
         if self._last_frame_ready or not self._video_playback_active or not self._current_trial(run_id, trial_id):
             return
 
         length = self._player.get_length()
         current = self._player.get_time()
+
         if length > 0 and current >= 0 and 0 <= length - current <= self.LAST_FRAME_CAPTURE_MS:
             os.makedirs(os.path.dirname(self._last_frame_path), exist_ok=True)
-            if self._player.video_take_snapshot(0, self._last_frame_path, self.width(), self.height()) == 0:
-                self._last_frame_pixmap = QPixmap(self._last_frame_path)
-                self._last_frame_ready = True
-            return
 
-        self._schedule(self.LAST_FRAME_POLL_MS, lambda: self._capture_last_frame_loop(run_id, trial_id), run_id, trial_id)
+            ok = self._player.video_take_snapshot(
+                0,
+                self._last_frame_path,
+                self.width(),
+                self.height()
+            ) == 0
+
+            if ok and os.path.exists(self._last_frame_path) and os.path.getsize(self._last_frame_path) > 0:
+                pixmap = QPixmap(self._last_frame_path)
+                if not pixmap.isNull():
+                    self._last_frame_pixmap = pixmap
+                    self._last_frame_ready = True
+                    return
+
+        self._schedule(
+            self.LAST_FRAME_POLL_MS,
+            lambda: self._capture_last_frame_loop(run_id, trial_id),
+            run_id,
+            trial_id
+        )
 
     def _handle_video_end(self, run_id=None, trial_id=None):
         run_id = self._run_id if run_id is None else run_id
         trial_id = self._active_trial_id if trial_id is None else trial_id
         if not self._current_trial(run_id, trial_id):
             return  # больше ничего не делаем
+        if not self._last_frame_ready:
+            self._capture_last_frame_from_screen()
         self._awaiting_first_frame = False
         self._video_playback_active = False
         self._hide_feedback_plot_widgets()
@@ -1056,7 +1093,7 @@ class StimuliPresentation_one_by_one(QWidget):
                 self.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation
             )
             self._background_label.setPixmap(self._background)
-            self._background_label.setGeometry(self.rect())
+            self._last_frame_label.setGeometry(self._video_widget.rect())
 
         if hasattr(self, "_cross_label"):
             if self._showing_final_image and self._final_image_path:
@@ -1072,7 +1109,7 @@ class StimuliPresentation_one_by_one(QWidget):
 
         if hasattr(self, "_video_placeholder"):
             self._video_placeholder.setPixmap(self._main_cross_pic)
-            self._video_placeholder.setGeometry(self.rect())
+            self._video_placeholder.setGeometry(self._video_widget.rect())
 
         if hasattr(self, "_last_frame_label"):
             self._last_frame_label.setGeometry(self.rect())

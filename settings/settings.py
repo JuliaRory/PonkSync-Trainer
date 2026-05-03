@@ -31,8 +31,8 @@ class StimuliSettings:
     saved_stimuli_curr: str = "bar_10-30_rest_vs_motor_1"
     sequence_mode: bool = False
     cross_ms: int = 1000
-    isi_min_s: float = 2.0
-    isi_max_s: float = 3.0
+    isi_min_s: float = 1.5
+    isi_max_s: float = 1.7
     show_feedback: int = 0
     feedback_ms: int = 2000
     feedback_mode: List[str] = field(default_factory=lambda: ["После каждой попытки", "После N попыток", "При превышении", "Без обратной связи"])
