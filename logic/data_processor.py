@@ -120,6 +120,7 @@ class DataProcessor(QObject):
         saved_path = self._save_mep_recording()
         self.mepRecordingFinished.emit(mean_amp, n_epochs, saved_path or "")
 
+    
     @pyqtSlot(object, float)
     def add_pack(self, pack, ts):
         """
@@ -235,7 +236,7 @@ class DataProcessor(QObject):
             return
 
         self._pending_feedback_requests += 1
-        self._try_emit_feedback()
+        self._try_emit_feedbac()
         return
 
         
@@ -419,7 +420,7 @@ class DataProcessor(QObject):
 
     def _calculate_mep_amplitude(self, epoch, time_ms):
         s = self.settings.mep_settings
-        mask = (time_ms >= s.plot_start_ms) & (time_ms <= s.plot_end_ms)
+        mask = (time_ms >= 15) & (time_ms <= 40)
         if not np.any(mask):
             return np.nan
         data = epoch[mask]

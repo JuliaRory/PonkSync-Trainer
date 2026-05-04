@@ -344,6 +344,7 @@ class StimuliControlPanel(QFrame):
         stats = self._load_results_stats()
         self.label_results_stats.setText(format_error_statistics(stats) if stats is not None else "Результаты: --")
 
+
     def _update_current_recording_stats(self):
         stats = self._load_results_stats(self._current_results_csv_path)
         self.label_results_stats.setText(format_error_statistics(stats) if stats is not None else "Результаты: --")

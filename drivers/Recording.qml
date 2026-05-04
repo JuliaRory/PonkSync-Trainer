@@ -73,8 +73,8 @@ DSM.StateMachine {
                     let ponkSyncService = ResonanceApp.getService("PonkSync-Trainer");
                     if (ponkSyncService) {recorder.addStream('discover:///?stream=stimuli&name=PonkSync-Trainer', 'stimuli');}
 
-                    let ponkDataService = ResonanceApp.getService("PonkSync_Trainer");
-                    if (ponkDataService) {recorder.addStream('discover:///?stream=ponk_data&name=PonkSync_Trainer', 'ponk_data');}
+                    let ponkDataService = ResonanceApp.getService("PonkSync-Trainer");
+                    if (ponkDataService) {recorder.addStream('discover:///?stream=ponk_data&name=PonkSync-Trainer', 'ponk_data');}
 
                     //recorder.addStream('discover:///?stream=eeg&name=nvx136', 'eeg')
 

@@ -153,8 +153,10 @@ class MEPPlotsWindow(QWidget):
     def set_record_mean(self, mean_amp, n_epochs, saved_path=None):
         if n_epochs <= 0 or not np.isfinite(mean_amp):
             self.label_mean_amp.setText("Mean MEP amp: -- mV")
+            self.label_mean_amp.repaint()
             return
         self.label_mean_amp.setText(f"Mean MEP amp: {mean_amp:.2f} mV (n={n_epochs})")
+        self.label_mean_amp.repaint()
 
     def _redraw_all(self):
         for i, curve in enumerate(self._curves):
