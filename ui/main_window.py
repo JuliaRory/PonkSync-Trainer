@@ -157,6 +157,7 @@ class MainWindow(QWidget):
             self._label_mep_mean.setText("Mean MEP amp: -- mV")
         else:
             self._label_mep_mean.setText(f"Mean MEP amp: {mean_amp:.2f} mV (n={n_epochs})")
+        self._label_mep_mean.repaint()
 
         if self._mep_window is not None:
             self._mep_window.set_record_mean(mean_amp, n_epochs, saved_path)
