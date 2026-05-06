@@ -48,7 +48,7 @@ class StimuliSettings:
     feedback_bar_scale_px: int = 610
     feedback_bar_scale_ms: int = 1500
 
-    subject: str = r"02NS"
+    subject: str = r"04KK"
     filename: str = r"test"
 
 
