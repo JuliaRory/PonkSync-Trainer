@@ -123,4 +123,4 @@ class Settings:
 
     activate_bat: bool = True
     bat_file: str = "D:\Resonance\dist_2025\control_ponk.bat"
-    bat_file_home: str = "C:/Users/hodor/Documents/lab-MSU/Works/2025.10_TMS/dist_2024_11_13_imp/control.bat"
+    bat_file_home: str = "C:/Users/hodor/Documents/lab-MSU/Works/2025.10_TMS/dist_2024_11_13_imp/control_ponk.bat"

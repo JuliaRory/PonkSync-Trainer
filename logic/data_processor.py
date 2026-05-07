@@ -134,7 +134,7 @@ class DataProcessor(QObject):
         
         self.res_timestamp = ts
         emg = self._process_new_pack(pack)
-        self.mep_emg.extend(self._last_mep_emg * 1E3)
+        self.mep_emg.extend(-self._last_mep_emg * 1E3)
         self.emg.extend(emg* 1E3)
 
         self.ts.extend(np.arange(self.timestamp, self.timestamp + emg.shape[0], 1) * self._coef)        # ms

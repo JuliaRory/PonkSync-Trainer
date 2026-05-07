@@ -31,7 +31,7 @@ class StreamSource(DataSource):
                 dataReady(object, float): испускается с аргументами packs и timestamp -> DataProcessor
         """
 
-        data = -np.array(msg)                 
+        data = np.array(msg)                 
         self.dataReady.emit(data, timestamp)  
     
     def _receive_message_data(self, msg, timestamp):
@@ -44,7 +44,7 @@ class StreamSource(DataSource):
                 dataReady(object, float): испускается с аргументами packs и timestamp -> DataProcessor
         """
 
-        data = -np.array(json.loads(msg)["data"]) # [n_channels x n_samples]       
+        data = np.array(json.loads(msg)["data"]) # [n_channels x n_samples]       
         self.dataReady.emit(data, timestamp)  
 
 
