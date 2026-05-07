@@ -1,0 +1,74 @@
+{
+  "no feedback - 15": {
+    "feedback_mode_curr": 3,
+    "stimuli_inf": false,
+    "stimuli_n": 15,
+    "isi_min_s": 1.5,
+    "isi_max_s": 1.7,
+    "record": true
+  },
+  "feedback - 25": {
+    "feedback_mode_curr": 0,
+    "stimuli_inf": false,
+    "stimuli_n": 25,
+    "isi_min_s": 1.5,
+    "isi_max_s": 1.7,
+    "record": true
+  },
+  "feedback - 40": {
+    "feedback_mode_curr": 0,
+    "stimuli_inf": false,
+    "stimuli_n": 40,
+    "isi_min_s": 1.5,
+    "isi_max_s": 1.7,
+    "record": true
+  },
+  "error feedback - 40": {
+    "feedback_mode_curr": 2,
+    "stimuli_inf": false,
+    "stimuli_n": 40,
+    "isi_min_s": 1.5,
+    "isi_max_s": 1.7,
+    "record": true
+  },
+  "no feedback - 30": {
+    "feedback_mode_curr": 3,
+    "stimuli_inf": false,
+    "stimuli_n": 30,
+    "isi_min_s": 1.5,
+    "isi_max_s": 1.7,
+    "record": true
+  },
+  "tms 1": {
+    "feedback_mode_curr": 3,
+    "sequence_mode": true,
+    "isi_min_s": 2.0,
+    "isi_max_s": 3.0,
+    "saved_stimuli_curr": "bar_10-30_rest_vs_motor_1",
+    "record": true
+  },
+  "tms 2": {
+    "feedback_mode_curr": 3,
+    "sequence_mode": true,
+    "isi_min_s": 2.0,
+    "isi_max_s": 3.0,
+    "saved_stimuli_curr": "bar_10-30_rest_vs_motor_2",
+    "record": true
+  },
+  "tms 3": {
+    "feedback_mode_curr": 3,
+    "sequence_mode": true,
+    "isi_min_s": 2.0,
+    "isi_max_s": 3.0,
+    "saved_stimuli_curr": "bar_10-30_rest_vs_motor_3",
+    "record": true
+  },
+  "tms 4": {
+    "feedback_mode_curr": 3,
+    "sequence_mode": true,
+    "isi_min_s": 2.0,
+    "isi_max_s": 3.0,
+    "saved_stimuli_curr": "bar_10-30_rest_vs_motor_4",
+    "record": true
+  }
+}

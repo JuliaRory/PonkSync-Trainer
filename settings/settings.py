@@ -27,6 +27,8 @@ class StimuliSettings:
 
     stimuli_n: int = 10
     stimuli_inf: bool = True
+    settings_presets_filename: str = r"resources/settings_presets.json"
+    last_subject_filename: str = r"resources/last_subject.json"
     saved_stimuli_filename: str = r"resources/saved_stimuli.json"
     saved_stimuli_curr: str = "bar_10-30_rest_vs_motor_1"
     sequence_mode: bool = False
@@ -122,5 +124,5 @@ class Settings:
     mep_settings: MEPSettings = field(default_factory=MEPSettings)
 
     activate_bat: bool = True
-    bat_file: str = "D:\Resonance\dist_2025\control_ponk.bat"
+    bat_file: str = r"D:\Resonance\dist_2025\control_ponk.bat"
     bat_file_home: str = "C:/Users/hodor/Documents/lab-MSU/Works/2025.10_TMS/dist_2024_11_13_imp/control_ponk.bat"
