@@ -79,7 +79,7 @@ class ProcessingSettings:
     montage_list: List[str] = field(default_factory=lambda: ["bipolar", "monopolar"])
     montage: str = 1
     emg_channels_bipolar: List[int] = field(default_factory=lambda: [64, 65])
-    emg_channels_monopolar: int = 1
+    emg_channels_monopolar: int = 0
 
     freq: int = 5000 # Hz
 

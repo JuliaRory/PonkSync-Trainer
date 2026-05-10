@@ -10,6 +10,7 @@ from numpy import diff, arange, array, full, sum, tile, newaxis, vstack, linspac
 from collections import deque
 import os
 import subprocess
+import glob
 
 from settings.settings import Settings 
 from settings.settings_handler import SettingsHandler
@@ -24,6 +25,7 @@ from ui.filter_panel import FilterPanel
 from ui.peak_panel import PeakDetectionPanel
 from ui.stimuli_control_panel import StimuliControlPanel
 from ui.mep_panel import MEPPlotsWindow
+from ui.mep_movement_detection_window import MEPMovementDetectionWindow
 from utils.ui_helpers import create_button
 
 WIDTH_SET, HEIGHT_SET = 1400, 800
@@ -75,8 +77,11 @@ class MainWindow(QWidget):
         self._figure_panel = OnlineGraph(self.settings, self._data_processor, parent=self)       # создать блок с графиками миограммы            --> self.plot_emg_graph
         self._stimuli_panel = StimuliControlPanel(self.settings, self._resonance, self._output_stream_stimuli, parent=self)
         self._mep_window = None
+        self._mep_detection_window = None
+        self._last_mep_record_path = None
         self._mep_panel = QFrame(self)
         self._button_mep_plots = create_button("MEP plots", parent=self._mep_panel, w=120)
+        self._button_mep_movement_detection = create_button("MEP delays", parent=self._mep_panel, w=120)
         self._button_show_mean_error = create_button("Show mean error", parent=self._mep_panel, w=140)
         self._label_mep_mean = QLabel("Mean MEP amp: -- mV", self._mep_panel)
     
@@ -89,6 +94,7 @@ class MainWindow(QWidget):
         mep_layout = QVBoxLayout(self._mep_panel)
         mep_layout.setContentsMargins(0, 0, 0, 0)
         mep_layout.addWidget(self._button_mep_plots)
+        mep_layout.addWidget(self._button_mep_movement_detection)
         mep_layout.addWidget(self._button_show_mean_error)
         mep_layout.addWidget(self._label_mep_mean)
         
@@ -121,6 +127,7 @@ class MainWindow(QWidget):
         self._data_processor.mepEpochReady.connect(self._on_mep_epoch_ready)
         self._data_processor.mepRecordingFinished.connect(self._on_mep_recording_finished)
         self._button_mep_plots.clicked.connect(self._show_mep_window)
+        self._button_mep_movement_detection.clicked.connect(self._show_mep_movement_detection_window)
         self._button_show_mean_error.clicked.connect(self._show_mean_error_on_video_player)
    
         self._data_processor.delayValues.connect(lambda delays: self._process_delays(delays))
@@ -133,6 +140,56 @@ class MainWindow(QWidget):
         self._mep_window.show()
         self._mep_window.raise_()
         self._mep_window.activateWindow()
+
+    def _show_mep_movement_detection_window(self):
+        record_path = self._find_current_record_path()
+        if record_path is None:
+            QMessageBox.warning(
+                self,
+                "MEP movement detection",
+                "Could not find the current HDF record. Check Subject, Record and that NVX recording was saved.",
+            )
+            return
+
+        if (
+            self._mep_detection_window is None
+            or self._mep_detection_window.record_path != record_path
+        ):
+            self._mep_detection_window = MEPMovementDetectionWindow(record_path, app_settings=self.settings)
+        self._mep_detection_window.show()
+        self._mep_detection_window.raise_()
+        self._mep_detection_window.activateWindow()
+
+    def _find_current_record_path(self):
+        if self._last_mep_record_path and os.path.exists(self._last_mep_record_path):
+            return self._last_mep_record_path
+
+        subject = self._stimuli_panel.line_edit_subject.text().strip()
+        record_name = self._stimuli_panel.line_edit_filename.text().strip()
+        if not subject or not record_name:
+            return None
+
+        folder = os.path.abspath(os.path.join("data", subject))
+        exact_candidates = [
+            os.path.join(folder, f"{record_name}.hdf"),
+            os.path.join(folder, f"{record_name}.hdf5"),
+            os.path.join(folder, f"{record_name}.h5"),
+        ]
+        for path in exact_candidates:
+            if os.path.exists(path):
+                return path
+
+        patterns = [
+            os.path.join(folder, f"{record_name}*.hdf"),
+            os.path.join(folder, f"{record_name}*.hdf5"),
+            os.path.join(folder, f"{record_name}*.h5"),
+        ]
+        matches = []
+        for pattern in patterns:
+            matches.extend(glob.glob(pattern))
+        if not matches:
+            return None
+        return max(matches, key=os.path.getmtime)
 
     def _show_mean_error_on_video_player(self):
         if not self._stimuli_panel.show_mean_error_on_player():
@@ -147,12 +204,15 @@ class MainWindow(QWidget):
             self._mep_window.add_mep(mep)
 
     def _on_mep_recording_started(self, path):
+        self._last_mep_record_path = path
         self._label_mep_mean.setText("Mean MEP amp: -- mV")
         if self._mep_window is not None:
             self._mep_window.set_record_mean(np.nan, 0, path)
         self._data_processor.start_mep_recording(path)
 
     def _on_mep_recording_finished(self, mean_amp, n_epochs, saved_path):
+        if saved_path:
+            self._last_mep_record_path = saved_path
         if n_epochs <= 0 or not np.isfinite(mean_amp):
             self._label_mep_mean.setText("Mean MEP amp: -- mV")
         else:
