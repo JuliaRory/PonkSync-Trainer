@@ -7,12 +7,13 @@ seq2 = np.asarray([1,2,1,1,1,2,1,1,1,2,1,1,2,1,1,2,1,1,1,1,2,1,1,1,2,1,2,1,1,1,1
 seq3 = np.asarray([1,1,1,1,1,2,1,1,1,2,1,2,1,1,1,2,1,1,2,1,1,1,1,2,1,1,1,2,1,1,2,1,1,2,1,1,1,1,1,2])
 seq4 = np.asarray([1,2,1,1,1,1,1,1,2,1,1,2,1,1,2,1,1,1,1,2,1,2,1,1,1,2,1,1,2,1,1,1,1,2,1,2,1,1,1,1])
 
-subject = "05UB"
+subject = "06TG"
+
 to_analysis = [
-    {"record": "09_05UB_tms_41MSO_real.hdf", "seq": seq1, "motor_label": "real", "power": "41MSO"},
-    {"record": "10_05UB_tms_33MSO_real.hdf", "seq": seq2, "motor_label": "real", "power": "33MSO"},
-    {"record": "11_05UB_tms_41MSO_MI.hdf", "seq": seq3, "motor_label": "MI", "power": "33MSO"},
-    {"record": "12_05UB_tms_33MSO_MI.hdf", "seq": seq4, "motor_label": "MI", "power": "41MSO"},
+    {"record": "08_06TG_tms_58MSO_real.hdf", "seq": seq1, "motor_label": "real", "power": "58MSO"},
+    {"record": "09_06TG_tms_43MSO_real.hdf", "seq": seq2, "motor_label": "real", "power": "43MSO"},
+    {"record": "10_06TG_tms_43MSO_MI.hdf", "seq": seq3, "motor_label": "MI", "power": "43MSO"},
+    {"record": "11_06TG_tms_58MSO_MI.hdf", "seq": seq4, "motor_label": "MI", "power": "58MSO"},
 ]
 
 
