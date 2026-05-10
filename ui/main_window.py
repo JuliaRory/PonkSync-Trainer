@@ -26,6 +26,7 @@ from ui.peak_panel import PeakDetectionPanel
 from ui.stimuli_control_panel import StimuliControlPanel
 from ui.mep_panel import MEPPlotsWindow
 from ui.mep_movement_detection_window import MEPMovementDetectionWindow
+from ui.mep_analysis_window import MEPAnalysisWindow
 from utils.ui_helpers import create_button
 
 WIDTH_SET, HEIGHT_SET = 1400, 800
@@ -79,9 +80,12 @@ class MainWindow(QWidget):
         self._mep_window = None
         self._mep_detection_window = None
         self._last_mep_record_path = None
+
+        self._button_mep_movement_detection = create_button("MEP delays", parent=self._mep_panel, w=120)
+        self._mep_analysis_window = None
         self._mep_panel = QFrame(self)
         self._button_mep_plots = create_button("MEP plots", parent=self._mep_panel, w=120)
-        self._button_mep_movement_detection = create_button("MEP delays", parent=self._mep_panel, w=120)
+        self._button_show_mep_analysis = create_button("посмотреть МВП", parent=self._mep_panel, w=140)
         self._button_show_mean_error = create_button("Show mean error", parent=self._mep_panel, w=140)
         self._label_mep_mean = QLabel("Mean MEP amp: -- mV", self._mep_panel)
     
@@ -95,6 +99,7 @@ class MainWindow(QWidget):
         mep_layout.setContentsMargins(0, 0, 0, 0)
         mep_layout.addWidget(self._button_mep_plots)
         mep_layout.addWidget(self._button_mep_movement_detection)
+        mep_layout.addWidget(self._button_show_mep_analysis)
         mep_layout.addWidget(self._button_show_mean_error)
         mep_layout.addWidget(self._label_mep_mean)
         
@@ -128,6 +133,7 @@ class MainWindow(QWidget):
         self._data_processor.mepRecordingFinished.connect(self._on_mep_recording_finished)
         self._button_mep_plots.clicked.connect(self._show_mep_window)
         self._button_mep_movement_detection.clicked.connect(self._show_mep_movement_detection_window)
+        self._button_show_mep_analysis.clicked.connect(self._show_mep_analysis_window)
         self._button_show_mean_error.clicked.connect(self._show_mean_error_on_video_player)
    
         self._data_processor.delayValues.connect(lambda delays: self._process_delays(delays))
@@ -190,6 +196,17 @@ class MainWindow(QWidget):
         if not matches:
             return None
         return max(matches, key=os.path.getmtime)
+
+    def _show_mep_analysis_window(self):
+        subject = self._stimuli_panel.line_edit_subject.text().strip()
+        record_name = self._stimuli_panel.line_edit_filename.text().strip()
+        if not subject or not record_name:
+            QMessageBox.information(self, "МВП", "Заполни Subject и Record.")
+            return
+
+        if self._mep_analysis_window is None:
+            self._mep_analysis_window = MEPAnalysisWindow(self.settings)
+        self._mep_analysis_window.show_record(subject, record_name)
 
     def _show_mean_error_on_video_player(self):
         if not self._stimuli_panel.show_mean_error_on_player():

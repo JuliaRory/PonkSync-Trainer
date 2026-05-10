@@ -54,6 +54,7 @@ class StimuliControlPanel(QFrame):
         self._player_window = None
         self._results_windows = []
         self._current_results_csv_path = None
+        self._load_last_subject()
 
     # =======================
     # =====     UI      =====
@@ -77,6 +78,8 @@ class StimuliControlPanel(QFrame):
         self.combo_box_stimuli = create_combo_box(self.settings.stimuli, curr_item_idx=self.settings.stimuli_curr, parent=self)
         self.combo_box_stimuli_type = create_combo_box(self.settings.stimuli_type, curr_item_idx=self.settings.stimuli_type_curr, parent=self)
         self.combo_box_fps = create_combo_box(self.settings.fps, curr_item_idx=self.settings.fps_curr, parent=self)
+        preset_names = [""] + self._load_settings_preset_names()
+        self.combo_box_settings_preset = create_combo_box(preset_names, parent=self)
         saved_stimuli_names = self._load_saved_stimuli_names()
         if saved_stimuli_names and self.settings.saved_stimuli_curr not in saved_stimuli_names:
             self.settings.saved_stimuli_curr = saved_stimuli_names[0]
@@ -114,6 +117,7 @@ class StimuliControlPanel(QFrame):
         layout_filename = create_hbox([QLabel("Subject:", self), self.line_edit_subject, QLabel("Record:", self), self.line_edit_filename])
         layout_start = create_hbox([self.button_stimuli, self.button_stimuli_pause, self.check_box_stimuli_record])
         layout_stimuli = create_hbox([self.combo_box_stimuli, QLabel("fps:"), self.combo_box_fps, self.button_stimuli_restart])
+        layout_settings_preset = create_hbox([QLabel("Пресет:", self), self.combo_box_settings_preset])
         layout_stimuli_type = create_hbox([QLabel("Тип стимулов:"), self.combo_box_stimuli_type])
         layout_saved_stimuli = create_hbox([self.check_box_stimuli_sequence_mode, self.combo_box_saved_stimuli])
         
@@ -132,6 +136,7 @@ class StimuliControlPanel(QFrame):
         layout.addWidget(self.label_results_stats)
         layout.addLayout(layout_filename)
         layout.addLayout(layout_start)
+        layout.addLayout(layout_settings_preset)
         layout.addLayout(layout_stimuli)
         layout.addLayout(layout_stimuli_type)
         layout.addLayout(layout_saved_stimuli)
@@ -189,6 +194,30 @@ class StimuliControlPanel(QFrame):
         if not isinstance(data, dict):
             return []
         return list(data.keys())
+
+    def _load_settings_preset_names(self):
+        try:
+            with open(self.settings.settings_presets_filename, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            return []
+        if not isinstance(data, dict):
+            return []
+        return list(data.keys())
+
+    def _load_last_subject(self):
+        try:
+            with open(self.settings.last_subject_filename, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            return
+
+        if not isinstance(data, dict):
+            return
+
+        subject = data.get("subject")
+        if isinstance(subject, str) and subject.strip():
+            self.settings.subject = subject.strip()
 
     def _update_recording_mode_widgets(self):
         sequence_mode = self.check_box_stimuli_sequence_mode.isChecked()
