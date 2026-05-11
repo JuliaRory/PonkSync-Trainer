@@ -56,12 +56,25 @@ class MEPAnalysisWindow(QWidget):
         if not self._hdf_path:
             return
 
+        bit = int(getattr(self.settings.mep_settings, "trigger_bit", 0))
         try:
             seq = self._load_sequence_for_record()
-            time, motor_epochs, rest_epochs = calculate_mep_amp(self._hdf_path, 2, seq)
+        except Exception:
+            seq = None
+
+        try:
+            time, motor_epochs, rest_epochs, info = calculate_mep_amp(
+                self._hdf_path,
+                bit,
+                seq,
+                return_info=True,
+            )
         except Exception as exc:
             QMessageBox.warning(self, "МВП", f"Не удалось построить МВП:\n{exc}")
             return
+
+        for warning in info.get("warnings", []):
+            QMessageBox.warning(self, "РњР’Рџ", warning)
 
         motor_mean = float(np.nanmean(_epoch_amplitudes(motor_epochs, time))) if motor_epochs.size else np.nan
         rest_mean = float(np.nanmean(_epoch_amplitudes(rest_epochs, time))) if rest_epochs.size else np.nan
@@ -75,6 +88,7 @@ class MEPAnalysisWindow(QWidget):
 
         self._label_info.setText(
             f"{os.path.basename(self._hdf_path)} | "
+            f"{info.get('source', '--')} | bit {bit} | "
             f"motor: {motor_epochs.shape[0]} epochs, mean {motor_mean:.3f} mV | "
             f"rest: {rest_epochs.shape[0]} epochs, mean {rest_mean:.3f} mV"
         )

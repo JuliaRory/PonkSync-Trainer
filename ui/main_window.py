@@ -80,10 +80,10 @@ class MainWindow(QWidget):
         self._mep_window = None
         self._mep_detection_window = None
         self._last_mep_record_path = None
-
+        self._mep_panel = QFrame(self)
         self._button_mep_movement_detection = create_button("MEP delays", parent=self._mep_panel, w=120)
         self._mep_analysis_window = None
-        self._mep_panel = QFrame(self)
+        
         self._button_mep_plots = create_button("MEP plots", parent=self._mep_panel, w=120)
         self._button_show_mep_analysis = create_button("посмотреть МВП", parent=self._mep_panel, w=140)
         self._button_show_mean_error = create_button("Show mean error", parent=self._mep_panel, w=140)

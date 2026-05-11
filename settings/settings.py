@@ -99,6 +99,7 @@ class DetectionSettings:
 
 @dataclass
 class MEPSettings:
+    trigger_bit: int = 0
     n_plots: int = 10
     epoch_start_ms: int = -100
     epoch_end_ms: int = 300

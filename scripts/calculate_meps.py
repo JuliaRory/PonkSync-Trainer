@@ -1,4 +1,5 @@
 import os
+import json
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -73,27 +74,124 @@ def _baseline_correction(epochs, time, from_ms=-20, to_ms=-5):
     return epochs - baseline_mean.reshape((-1, 1))
 
 
-def calculate_mep_amp(filename_path, bit, seq):
-    import h5py
+def _decode_stimulus_message(message):
+    if isinstance(message, bytes):
+        message = message.decode("utf-8", errors="replace")
+    try:
+        data = json.loads(message)
+    except (TypeError, json.JSONDecodeError):
+        return None
+    stimulus = data.get("stimulus") if isinstance(data, dict) else None
+    return str(stimulus) if stimulus else None
 
-    seq = _clean_sequence(seq)
-    with h5py.File(filename_path, "r") as h5f:
-        data = h5f["eeg/data"][:-1]
 
-    emg = data[:, 0]
+def _trigger_events_and_block_timestamps(h5f, bit):
+    data = h5f["eeg/data"][:-1]
     trigger = data[:, -1]
     ttl = np.array(trigger, dtype=np.uint8)
     trigger = ((ttl >> bit) & 0b1).astype(int)
     trigger_diff = np.diff(trigger)
-    events = np.where(trigger_diff == 1)[0]
+    events = np.where(trigger_diff == 1)[0] + 1
+
+    block_timestamps = np.full(events.shape, np.nan, dtype=float)
+    if "eeg/blocks" in h5f and len(events):
+        blocks = h5f["eeg/blocks"][:]
+        if "samples" in blocks.dtype.names and "received" in blocks.dtype.names:
+            cum_samples = np.cumsum(blocks["samples"].astype(np.int64))
+            block_idxs = np.searchsorted(cum_samples, events, side="right")
+            block_idxs = np.clip(block_idxs, 0, len(blocks) - 1)
+            block_timestamps = blocks["received"][block_idxs].astype(float)
+
+    return data, events, block_timestamps
+
+
+def _stimulus_labels_from_stream(h5f, events, event_timestamps):
+    warnings = []
+    if "stimuli/messages" not in h5f:
+        return None, warnings
+
+    messages = h5f["stimuli/messages"][:]
+    stimuli = []
+    for row in messages:
+        stimulus = _decode_stimulus_message(row["message"])
+        if stimulus is None:
+            continue
+        stimuli.append({
+            "received": float(row["received"]),
+            "stimulus": stimulus,
+            "label": 2 if "rest" in stimulus.lower() else 1,
+        })
+
+    n_events = len(events)
+    n_stimuli_original = len(stimuli)
+    if n_stimuli_original == n_events + 1:
+        stimuli = stimuli[1:]
+    elif n_stimuli_original != n_events:
+        warnings.append(
+            f"Stimuli count ({n_stimuli_original}) does not match trigger events ({n_events}) on the selected bit."
+        )
+
+    if not stimuli:
+        warnings.append("Stimuli stream exists, but no stimulus messages were decoded.")
+        return None, warnings
+
+    stimulus_timestamps = np.asarray([item["received"] for item in stimuli], dtype=float)
+    labels = []
+    matched_stimuli = []
+    for timestamp in event_timestamps:
+        if np.isfinite(timestamp):
+            idx = int(np.argmin(np.abs(stimulus_timestamps - timestamp)))
+        else:
+            idx = min(len(labels), len(stimuli) - 1)
+        labels.append(stimuli[idx]["label"])
+        matched_stimuli.append(stimuli[idx]["stimulus"])
+
+    return {
+        "seq": np.asarray(labels, dtype=int),
+        "source": "stimuli stream",
+        "stimuli_count": n_stimuli_original,
+        "trigger_count": n_events,
+        "matched_stimuli": matched_stimuli,
+        "warnings": warnings,
+    }, warnings
+
+
+def calculate_mep_amp(filename_path, bit, seq=None, return_info=False):
+    import h5py
+
+    with h5py.File(filename_path, "r") as h5f:
+        data, events, event_timestamps = _trigger_events_and_block_timestamps(h5f, bit)
+        stream_info, stream_warnings = _stimulus_labels_from_stream(h5f, events, event_timestamps)
+
+    emg = data[:, 0]
+    warnings = list(stream_warnings)
+    if stream_info is not None:
+        seq = stream_info["seq"]
+        source = stream_info["source"]
+    else:
+        if seq is None:
+            raise ValueError("No stimuli stream was found, and no fallback sequence was provided.")
+        warnings.append("No stimuli stream was found in HDF. Falling back to the selected saved sequence.")
+        seq = _clean_sequence(seq)
+        source = "saved sequence fallback"
 
     start = ms_to_samples(-20)
     end = ms_to_samples(60)
     time = np.linspace(-20, 60, end - start)
-    valid_events = [timestamp for timestamp in events if timestamp + start >= 0 and timestamp + end <= emg.size]
-    if seq.size:
-        valid_events = valid_events[:seq.size]
-        seq = seq[:len(valid_events)]
+
+    event_labels = np.asarray(seq, dtype=int)
+    valid_pairs = [
+        (timestamp, label)
+        for timestamp, label in zip(events, event_labels)
+        if timestamp + start >= 0 and timestamp + end <= emg.size
+    ]
+    if not valid_pairs:
+        valid_events = []
+        seq = np.asarray([], dtype=int)
+    else:
+        valid_events = [timestamp for timestamp, _ in valid_pairs]
+        seq = np.asarray([label for _, label in valid_pairs], dtype=int)
+
     epochs = np.asarray([emg[timestamp + start:timestamp + end] for timestamp in valid_events])
     if epochs.size == 0:
         raise ValueError("No valid MEP epochs found in the selected record.")
@@ -111,6 +209,16 @@ def calculate_mep_amp(filename_path, bit, seq):
     bas_motor_epochs = bas_epochs[np.where(seq == 1)] * 1e3
     bas_rest_epochs = bas_epochs[np.where(seq == 2)] * 1e3
 
+    info = {
+        "source": source,
+        "warnings": warnings,
+        "trigger_count": int(len(events)),
+        "stimuli_count": None if stream_info is None else int(stream_info["stimuli_count"]),
+        "motor_count": int(bas_motor_epochs.shape[0]),
+        "rest_count": int(bas_rest_epochs.shape[0]),
+    }
+    if return_info:
+        return time, bas_motor_epochs, bas_rest_epochs, info
     return time, bas_motor_epochs, bas_rest_epochs
 
 
