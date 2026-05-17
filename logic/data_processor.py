@@ -236,7 +236,7 @@ class DataProcessor(QObject):
             return
 
         self._pending_feedback_requests += 1
-        self._try_emit_feedbac()
+        self._try_emit_feedback()
         return
 
         
