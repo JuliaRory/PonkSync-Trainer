@@ -468,6 +468,7 @@ class StimuliControlPanel(QFrame):
         self.label_stimuli_idx.setText(f"#{idx}")
 
     def _on_stimuli_order_changed(self, filename):
+        self.settings.current_stimulus_filename = filename
         message = {"stimulus": filename}
         print(message)
         if self.output_stream is not None:

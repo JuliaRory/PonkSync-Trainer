@@ -7,7 +7,7 @@ import json
 
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel, QStackedWidget
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer
-from PyQt5.QtGui import QPixmap
+from PyQt5.QtGui import QPixmap, QPainter, QPen, QColor
 
 from ui.feedback_graph import FeedbackGraph
 from ui.feedback_bar import FeedbackBar
@@ -33,6 +33,46 @@ import logging
 # 
 # закрытие окна (и остановка видео) происходит при нажатии на кнопку Escape или по окончании последовательности стимулов
 # окончание последовательности стимулов вызывает сигнал stimuliFinished
+
+class SSTMovementFeedback(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+        self.setAttribute(Qt.WA_NoSystemBackground, True)
+        self.setStyleSheet("background: transparent;")
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.fillRect(self.rect(), QColor(0, 0, 0))
+
+        width = self.width()
+        height = self.height()
+        line_y = height // 2
+        line_margin = max(80, width // 5)
+
+        painter.setPen(QPen(QColor(255, 255, 255), 8, Qt.SolidLine, Qt.RoundCap))
+        painter.drawLine(line_margin, line_y, width - line_margin, line_y)
+
+        cross_size = max(70, min(width, height) // 7)
+        cross_x = width // 2
+        cross_y = line_y - cross_size
+        painter.setPen(QPen(QColor(255, 0, 0), 10, Qt.SolidLine, Qt.RoundCap))
+        painter.drawLine(
+            cross_x - cross_size // 2,
+            cross_y - cross_size // 2,
+            cross_x + cross_size // 2,
+            cross_y + cross_size // 2,
+        )
+        painter.drawLine(
+            cross_x + cross_size // 2,
+            cross_y - cross_size // 2,
+            cross_x - cross_size // 2,
+            cross_y + cross_size // 2,
+        )
+        painter.end()
+
 
 class StimuliPresentation_one_by_one(QWidget):
     stimuliStarted = pyqtSignal()
@@ -89,6 +129,9 @@ class StimuliPresentation_one_by_one(QWidget):
         self._saved_sequence_set = {}
         self._saved_sequence_cross_filename = None
         self._saved_sequence_cross_ms = None
+        self._single_sst_order = []
+        self._single_sst_pair_order = []
+        self._single_sst_last_signature = None
         self._showing_final_image = False
         self._final_image_path = None
         self._marker_visible_during_current_video = False
@@ -197,6 +240,80 @@ class StimuliPresentation_one_by_one(QWidget):
             raise ValueError(f"Stimulus code {key!r} is not present in saved sequence set.")
         self._set_media_from_filename(filename)
 
+    def _load_stimuli_path_data(self):
+        with open(r'resources/stimuli_path.json', 'r') as f:
+            return json.load(f)
+
+    def _resolve_single_video_filename(self, data=None):
+        data = self._load_stimuli_path_data() if data is None else data
+        type_key = {
+            0: "circle",
+            1: "vbar",
+            2: "bar",
+        }.get(self.settings.stimuli_type_curr)
+        fps_key = self.settings.fps[self.settings.fps_curr]
+
+        try:
+            return data["single"][type_key][fps_key]
+        except KeyError as exc:
+            raise ValueError(
+                f"No single stimulus video for type={type_key!r}, fps={fps_key!r}"
+            ) from exc
+
+    def _is_single_sst_mode(self):
+        return self.settings.stimuli_curr == 1
+
+    def _single_sst_signature(self):
+        return (
+            self.settings.stimuli_type_curr,
+            self.settings.fps_curr,
+            self.n,
+            getattr(self.settings, "SST_video", None),
+        )
+
+    def _prepare_single_sst_order(self):
+        signature = self._single_sst_signature()
+        if self._single_sst_last_signature == signature and (self.n is None or self._single_sst_order):
+            return
+
+        single_video = self._resolve_single_video_filename()
+        sst_video = getattr(self.settings, "SST_video", None)
+        if not sst_video:
+            raise ValueError("SST_video is not configured.")
+
+        self._single_sst_last_signature = signature
+        self._single_sst_pair_order = []
+        if self.n is None:
+            self._single_sst_order = []
+            return
+
+        if self.n <= 0:
+            self._single_sst_order = [sst_video]
+            return
+
+        sst_n = self.n // 2
+        single_n = self.n - sst_n
+        order = [sst_video] * sst_n + [single_video] * single_n
+        np.random.shuffle(order)
+        self._single_sst_order = order
+
+    def _set_single_sst_video_path(self, sequence_index):
+        self._prepare_single_sst_order()
+
+        if self.n is not None:
+            order_index = min(sequence_index, len(self._single_sst_order) - 1)
+            filename = self._single_sst_order[order_index]
+            self._set_media_from_filename(filename)
+            return
+
+        single_video = self._resolve_single_video_filename()
+        sst_video = getattr(self.settings, "SST_video", None)
+        if sequence_index % 2 == 0:
+            self._single_sst_pair_order = [sst_video, single_video]
+            np.random.shuffle(self._single_sst_pair_order)
+        filename = self._single_sst_pair_order[sequence_index % 2]
+        self._set_media_from_filename(filename)
+
     def set_video_path(self):
         if self._sequence_mode_enabled():
             if not self._saved_sequence_order:
@@ -207,13 +324,17 @@ class StimuliPresentation_one_by_one(QWidget):
             self._apply_cross_settings()
             return
 
+        if self._is_single_sst_mode():
+            self._set_single_sst_video_path(self._counter)
+            self._apply_cross_settings()
+            return
+
         stimuli = self.settings.stimuli_curr
         stimuli_type = self.settings.stimuli_type_curr
         fps = self.settings.fps_curr
 
         # Загружаем данные
-        with open(r'resources/stimuli_path.json', 'r') as f:
-            data = json.load(f)
+        data = self._load_stimuli_path_data()
 
         def get_selected_path(data, combo1_value, combo2_value, combo3_value=None):
             key = {
@@ -232,12 +353,7 @@ class StimuliPresentation_one_by_one(QWidget):
             combo1_value = key[combo1_value]
             combo2_value = key[combo2_value]
             if combo1_value == "single":
-                try:
-                    return data["single"][combo2_value][combo3_value]
-                except KeyError as exc:
-                    raise ValueError(
-                        f"No single stimulus video for type={combo2_value!r}, fps={combo3_value!r}"
-                    ) from exc
+                return self._resolve_single_video_filename(data)
             elif combo1_value == "single_SST":
                 return getattr(self.settings, "SST_video", None)
             elif combo1_value == "triplets":
@@ -291,6 +407,11 @@ class StimuliPresentation_one_by_one(QWidget):
             self.set_number(None)
         else:
             self.set_number(self.settings.stimuli_n)
+        self._single_sst_order = []
+        self._single_sst_pair_order = []
+        self._single_sst_last_signature = None
+        if self._is_single_sst_mode():
+            self._prepare_single_sst_order()
         self._apply_cross_settings()
 
     def _current_run(self, run_id):
@@ -646,6 +767,10 @@ class StimuliPresentation_one_by_one(QWidget):
         self._feedback_graph = FeedbackGraph(w, h, self._feedback_widget)
         self._feedback_graph.move(center_x, center_y)
 
+        self._sst_feedback_widget = SSTMovementFeedback(self._feedback_widget)
+        self._sst_feedback_widget.setGeometry(self._feedback_widget.rect())
+        self._sst_feedback_widget.hide()
+
         self.change_stimuli()
         # self._feedback_graph.setGeometry(x, y, width, height)
 
@@ -664,7 +789,7 @@ class StimuliPresentation_one_by_one(QWidget):
             self._feedback_graph.hide()
             for graph in self._feedback_graphs:
                 graph.show()
-        elif self.settings.stimuli_curr == 0:
+        elif self.settings.stimuli_curr in (0, 1):
             for graph in self._feedback_graphs:
                 graph.hide()
             self._feedback_graph.show()
@@ -676,6 +801,8 @@ class StimuliPresentation_one_by_one(QWidget):
         self._feedback_graph.hide()
         for graph in self._feedback_graphs:
             graph.hide()
+        if hasattr(self, "_sst_feedback_widget"):
+            self._sst_feedback_widget.hide()
 
     def _clear_last_frame_background(self, remove_file=False):
         self._last_frame_ready = False
@@ -819,6 +946,8 @@ class StimuliPresentation_one_by_one(QWidget):
         sequence_index = self._counter
         if self._sequence_mode_enabled():
             self._set_sequence_video_path(sequence_index)
+        elif self._is_single_sst_mode():
+            self._set_single_sst_video_path(sequence_index)
 
         self._counter += 1
         self._active_trial_id += 1
@@ -1028,6 +1157,30 @@ class StimuliPresentation_one_by_one(QWidget):
         self._feedback_bar.hide()
         if hasattr(self, "_last_frame_label"):
             self._last_frame_label.hide()
+
+    def _current_stimulus_is_sst_video(self):
+        return (
+            self._is_single_sst_mode()
+            and not self._sequence_mode_enabled()
+            and os.path.basename(getattr(self, "_current_stimulus_filename", "")) == os.path.basename(getattr(self.settings, "SST_video", ""))
+        )
+
+    def _movement_detected_for_sst(self):
+        return bool(np.any(~np.isnan(self.delay_value)))
+
+    def _show_sst_movement_feedback_mode(self):
+        self._background_label.hide()
+        self._hide_feedback_bar_mode()
+        self._hide_feedback_plot_widgets()
+        if hasattr(self, "_video_placeholder"):
+            self._video_placeholder.hide()
+        if hasattr(self, "_last_frame_label"):
+            self._last_frame_label.hide()
+
+        self._sst_feedback_widget.setGeometry(self._feedback_widget.rect())
+        self._sst_feedback_widget.show()
+        self._sst_feedback_widget.raise_()
+        self._stacked.setCurrentIndex(1)
         
 
     def _check_feedback(self):
@@ -1036,6 +1189,22 @@ class StimuliPresentation_one_by_one(QWidget):
         if trial_id is None or not self._current_trial(run_id, trial_id):
             return
         self._feedback_rendering_trial_id = trial_id
+
+        if self._current_stimulus_is_sst_video():
+            self.show_delay = False
+            if self._movement_detected_for_sst():
+                self._show_sst_movement_feedback_mode()
+                feedback_duration_ms = self._feedback_ms
+                if not self._is_paused:
+                    self._feedback_trial_id = None
+                    self._schedule(feedback_duration_ms, lambda: self._finish_feedback(run_id, trial_id), run_id, trial_id)
+                else:
+                    self._schedule(250, self._check_feedback, run_id, trial_id)
+            else:
+                self._feedback_trial_id = None
+                self._feedback_rendering_trial_id = None
+                self._show_cross()
+            return
         
         if self.settings.feedback_form_curr == 0:
             if self.settings.stimuli_curr == 2: # triplets
@@ -1177,6 +1346,9 @@ class StimuliPresentation_one_by_one(QWidget):
         if hasattr(self, "_feedback_bar"):
             self._feedback_bar.setFixedSize(self.size())
             self._feedback_bar.move(0, 0)
+
+        if hasattr(self, "_sst_feedback_widget"):
+            self._sst_feedback_widget.setGeometry(self._feedback_widget.rect())
 
         if "_marker_widget" in self.__dict__:
             self._marker_widget.setGeometry(max(0, self.width() - 80), 0, 80, 80)

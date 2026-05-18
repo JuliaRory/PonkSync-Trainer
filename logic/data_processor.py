@@ -266,6 +266,14 @@ class DataProcessor(QObject):
         stimuli = self.settings.stimuli_settings.stimuli_curr
         return 3 if stimuli == 2 else 1
 
+    def _current_stimulus_is_sst_video(self):
+        s = self.settings.stimuli_settings
+        return (
+            s.stimuli_curr == 1
+            and not s.sequence_mode
+            and os.path.basename(getattr(s, "current_stimulus_filename", "")) == os.path.basename(getattr(s, "SST_video", ""))
+        )
+
     def _try_emit_feedback(self):
         s = self.settings.stimuli_settings
         feedback = s.feedback_mode_curr
@@ -305,7 +313,9 @@ class DataProcessor(QObject):
             send_feedback = True
             if feedback == 2:
                 limits = s.delay_limit
-                send_feedback = any(abs(value) > limit for value, limit in zip(feedack_values, limits))
+                send_feedback = self._current_stimulus_is_sst_video() or any(
+                    abs(value) > limit for value, limit in zip(feedack_values, limits)
+                )
 
             if send_feedback:
                 self.delayValues.emit(feedack_values)

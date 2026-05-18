@@ -13,7 +13,7 @@ class StimuliSettings:
     triplet_video: str = "animatedTriplet_tms3_0ms_allsounds.mkv"
     single_video: str = "animatedSingle1500_tms_0ms_nosounds.mkv"
     SRT_video: str = "PS__SRT.mkv" 
-    SST_video: str = "animatedSingle1500_stop-200ms_tms_0ms_nosounds.mkv"
+    SST_video: str = "animatedSingle1500_stop-200ms_tms_0ms_nosounds_bar.mkv"
 
     bar_figure: str = "bar_figure.png"
     
@@ -31,6 +31,7 @@ class StimuliSettings:
     last_subject_filename: str = r"resources/last_subject.json"
     saved_stimuli_filename: str = r"resources/saved_stimuli.json"
     saved_stimuli_curr: str = "bar_10-30_rest_vs_motor_1"
+    current_stimulus_filename: str = ""
     sequence_mode: bool = False
     cross_ms: int = 1000
     isi_min_s: float = 1.5
