@@ -120,8 +120,8 @@ class FeedbackBar(QWidget):
         if self.show_cross_label:
             center_x = self.width() // 2
             metrics = painter.fontMetrics()
-            cross_size = max(28, metrics.height() - 8)
-            cross_center_y = text_y - metrics.ascent() // 2 + metrics.descent() // 2
+            cross_size = int(max(28, metrics.height() - 8) * 2.0)
+            cross_center_y = self.height() // 2
             half = cross_size // 2
             painter.setPen(QPen(QColor(255, 0, 0), 8, Qt.SolidLine, Qt.RoundCap))
             painter.drawLine(center_x - half, cross_center_y - half, center_x + half, cross_center_y + half)

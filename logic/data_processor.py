@@ -60,6 +60,7 @@ class DataProcessor(QObject):
         self.timestamp = 0
 
         self._trigger = None
+        self._trigger_stimulus_filename = ""
 
         self._ponk_count = 0
         self._delays = []
@@ -95,6 +96,7 @@ class DataProcessor(QObject):
         self._feedback_cursor = 0
         self._pending_feedback_requests = 0
         self._trigger = None
+        self._trigger_stimulus_filename = ""
 
     def start_mep_recording(self, hdf_path):
         self._mep_hdf_path = hdf_path
@@ -214,12 +216,21 @@ class DataProcessor(QObject):
 
             data["mode"] = "TKEO" if self.settings.processing_settings.tkeo else "EMG"
             data['threshold'] = threshold
+            stimulus_filename = self._trigger_stimulus_filename or getattr(
+                self.settings.stimuli_settings, "current_stimulus_filename", ""
+            )
+            sst_video = getattr(self.settings.stimuli_settings, "SST_video", "")
+            data["stimulus_filename"] = stimulus_filename
+            data["is_sst_trial"] = int(
+                os.path.basename(stimulus_filename) == os.path.basename(sst_video)
+            )
             self.logger.log_trial(data)
             # print("PONK COUNTER", self._ponk_count)
             self._delays.append(delay)       # накапливает все задержки  
             self._feedback_counter += 1      # для показа N-усреднённой обратной связи
             self._ponk_count += 1
             self._trigger = None
+            self._trigger_stimulus_filename = ""
             self._try_emit_feedback()
 
 
@@ -337,6 +348,9 @@ class DataProcessor(QObject):
             # print("EVENT SOUND", bit, event)
             idx =-(len(trigger) - event[0]-1)
             self.triggerIdx.emit(idx)
+            self._trigger_stimulus_filename = getattr(
+                self.settings.stimuli_settings, "current_stimulus_filename", ""
+            )
             self._trigger = self.ts[idx]       # для обработки поньков  [ms]
         
             

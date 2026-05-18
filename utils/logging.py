@@ -26,10 +26,16 @@ class ExperimentLogger:
             'mode',                # EMG or TKEO
             'threshold'            # порог
         ]
+        self.fieldnames.extend([
+            'stimulus_filename',
+            'is_sst_trial',
+        ])
         
         # Создаем файл
         # filename = os.path.join(r"data/tests", filename)
         file_exists = os.path.isfile(filename)
+        if file_exists:
+            self._ensure_current_header()
         self.file = open(filename, 'a', newline='', encoding='utf-8')
         self.writer = csv.DictWriter(self.file, fieldnames=self.fieldnames)
         
@@ -39,6 +45,24 @@ class ExperimentLogger:
         
         self.trial_number = 0
     
+    def _ensure_current_header(self):
+        try:
+            with open(self.filename, newline='', encoding='utf-8') as file:
+                reader = csv.DictReader(file)
+                current_fieldnames = reader.fieldnames or []
+                rows = list(reader)
+        except (OSError, csv.Error):
+            return
+
+        if all(field in current_fieldnames for field in self.fieldnames):
+            return
+
+        with open(self.filename, 'w', newline='', encoding='utf-8') as file:
+            writer = csv.DictWriter(file, fieldnames=self.fieldnames)
+            writer.writeheader()
+            for row in rows:
+                writer.writerow({field: row.get(field, "") for field in self.fieldnames})
+
     def set_output_stream(self, output_stream):
         self.output_stream = output_stream
 

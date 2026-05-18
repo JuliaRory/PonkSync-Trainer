@@ -468,7 +468,7 @@ class StimuliPresentation_one_by_one(QWidget):
             "QLabel {"
             "color: white;"
             "background-color: rgba(0, 0, 0, 180);"
-            "font-size: 64px;"
+            "font-size: 42px;"
             "font-weight: 700;"
             "padding: 18px;"
             "border-radius: 8px;"
@@ -494,9 +494,9 @@ class StimuliPresentation_one_by_one(QWidget):
         if "_mean_error_label" not in self.__dict__:
             return
         width = int(self.width() * 0.82)
-        height = 130
+        height = 230
         x = int((self.width() - width) / 2)
-        y = int(self.height() * 0.18)
+        y = int(self.height() * 0.10)
         self._mean_error_label.setGeometry(x, y, width, height)
 
     def _update_results_plot_label_geometry(self):
@@ -518,10 +518,12 @@ class StimuliPresentation_one_by_one(QWidget):
             self._results_plot_label.hide()
         self._results_plot_path = None
 
-    def show_mean_error(self, mean_error, plot_path=None, duration_ms=None):
+    def show_mean_error(self, mean_error, plot_path=None, duration_ms=None, text=None):
         if "_mean_error_label" not in self.__dict__:
             return
-        if np.isfinite(mean_error):
+        if text is not None:
+            text = str(text)
+        elif np.isfinite(mean_error):
             text = f"Средняя ошибка: {mean_error:.2f} мс"
         else:
             text = "Средняя ошибка: --"
@@ -883,7 +885,7 @@ class StimuliPresentation_one_by_one(QWidget):
             self._feedback_graph.raise_()
         self._show_marker()
 
-    def _show_feedback_bar_mode(self):
+    def _show_feedback_bar_mode(self, fallback_to_cross=True):
         self._background_label.hide()
         self._hide_feedback_plot_widgets()
 
@@ -896,12 +898,14 @@ class StimuliPresentation_one_by_one(QWidget):
 
         shown = self._show_last_frame_background()
 
-        if not shown:
+        if not shown and fallback_to_cross:
             # fallback лучше крест/placeholder, чем черный фон
             self._video_placeholder.setPixmap(self._main_cross_pic)
             self._video_placeholder.setGeometry(self.rect())
             self._video_placeholder.show()
             self._video_placeholder.raise_()
+        elif not shown:
+            self._video_widget.show()
 
         self._feedback_bar.setFixedSize(self.size())
         self._feedback_bar.move(0, 0)
@@ -1030,7 +1034,7 @@ class StimuliPresentation_one_by_one(QWidget):
     #     self._schedule(self.LAST_FRAME_POLL_MS, lambda: self._capture_last_frame_loop(run_id, trial_id), run_id, trial_id)
 
     def _capture_last_frame_loop(self, run_id, trial_id):
-        if self._last_frame_ready or not self._video_playback_active or not self._current_trial(run_id, trial_id):
+        if not self._video_playback_active or not self._current_trial(run_id, trial_id):
             return
 
         length = self._player.get_length()
@@ -1040,6 +1044,14 @@ class StimuliPresentation_one_by_one(QWidget):
         #     self._last_frame_ready = True
         #     self._last_frame_pixmap = QPixmap(r"resources\stimuli\bar_figure.png")
         #     return 
+
+        if (
+            length > 0
+            and current >= 0
+            and not self._awaiting_first_frame
+            and 0 <= length - current <= max(1000, self.LAST_FRAME_CAPTURE_MS)
+        ):
+            self._capture_last_frame_from_screen()
 
         if length > 0 and current >= 0 and 0 <= length - current <= self.LAST_FRAME_CAPTURE_MS:
             os.makedirs(os.path.dirname(self._last_frame_path), exist_ok=True)
@@ -1058,9 +1070,10 @@ class StimuliPresentation_one_by_one(QWidget):
             #         self._last_frame_ready = True
             #         return
             if self._player.video_take_snapshot(0, self._last_frame_path, self.width(), self.height()) == 0:
-                self._last_frame_ready = True
-                self._last_frame_pixmap = QPixmap(self._last_frame_path)
-                return
+                pixmap = QPixmap(self._last_frame_path)
+                if not pixmap.isNull():
+                    self._last_frame_ready = True
+                    self._last_frame_pixmap = pixmap
 
         self._schedule(
             self.LAST_FRAME_POLL_MS,
@@ -1171,12 +1184,33 @@ class StimuliPresentation_one_by_one(QWidget):
         return bool(np.any(~np.isnan(self.delay_value)))
 
     def _show_sst_movement_feedback_mode(self):
+        self._background_label.hide()
+        self._hide_feedback_plot_widgets()
+        self._video_widget.hide()
+        if hasattr(self, "_last_frame_label"):
+            self._last_frame_label.hide()
+
+        background_path = os.path.join(r"resources\stimuli", "background_white_photomark.png")
+        background = QPixmap(background_path)
+        if not background.isNull():
+            self._video_placeholder.setPixmap(
+                background.scaled(self.size(), Qt.IgnoreAspectRatio, Qt.SmoothTransformation)
+            )
+        self._video_placeholder.setGeometry(self.rect())
+        self._video_placeholder.show()
+        self._video_placeholder.raise_()
+        self._stacked.setCurrentIndex(0)
+
         self._feedback_bar.set_triangle_params(vertex_x=0)
         self._feedback_bar.set_cross_label(True)
         self._feedback_bar.show_triangle = False
         self._feedback_bar.show_measure_line = False
         self._feedback_bar.show_label = True
-        self._show_feedback_bar_mode()
+        self._feedback_bar.setFixedSize(self.size())
+        self._feedback_bar.move(0, 0)
+        self._feedback_bar.show()
+        self._feedback_bar.raise_()
+        self._feedback_bar.update()
         
 
     def _check_feedback(self):

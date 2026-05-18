@@ -5,6 +5,7 @@ from PyQt5.QtGui import QKeySequence
 import json
 import os
 import numpy as np
+import pandas as pd
 
 from utils.ui_helpers import create_button, create_spin_box, create_check_box, create_combo_box, create_shortcut, create_lineedit
 from utils.layout_utils import create_hbox, create_vbox
@@ -348,11 +349,79 @@ class StimuliControlPanel(QFrame):
             print(f"Could not load results from {csv_path}: {exc}")
             return None
 
+    def _split_sst_results_df(self, df):
+        if df is None:
+            return None, None
+
+        if "is_sst_trial" in df:
+            marker = df["is_sst_trial"].astype(str).str.strip().str.lower()
+            sst_mask = marker.isin({"1", "true", "yes", "y"})
+        elif "stimulus_filename" in df:
+            sst_basename = os.path.basename(getattr(self.settings, "SST_video", ""))
+            sst_mask = df["stimulus_filename"].astype(str).map(lambda value: os.path.basename(value) == sst_basename)
+        else:
+            sst_mask = np.zeros(df.shape[0], dtype=bool)
+
+        return df.loc[~sst_mask].copy(), df.loc[sst_mask].copy()
+
+    def _calculate_performance_stats(self, df):
+        normal_df, sst_df = self._split_sst_results_df(df)
+        if normal_df is None:
+            return None
+
+        limit = abs(self.settings.delay_limit[0]) if self.settings.delay_limit else 200
+        normal_error = (
+            pd.to_numeric(normal_df["error"], errors="coerce").to_numpy(dtype=float)
+            if "error" in normal_df
+            else np.array([], dtype=float)
+        )
+        normal_total = int(normal_df.shape[0])
+        normal_in_limits = int(np.sum(np.isfinite(normal_error) & (np.abs(normal_error) <= limit)))
+        normal_percent = np.nan if normal_total == 0 else 100.0 * normal_in_limits / normal_total
+
+        sst_error = (
+            pd.to_numeric(sst_df["error"], errors="coerce").to_numpy(dtype=float)
+            if "error" in sst_df
+            else np.array([], dtype=float)
+        )
+        sst_total = int(sst_df.shape[0])
+        sst_correct = int(np.sum(~np.isfinite(sst_error)))
+        sst_percent = np.nan if sst_total == 0 else 100.0 * sst_correct / sst_total
+
+        return {
+            "normal_df": normal_df,
+            "sst_df": sst_df,
+            "normal_stats": calculate_error_statistics(normal_df),
+            "normal_total": normal_total,
+            "normal_in_limits": normal_in_limits,
+            "normal_percent": normal_percent,
+            "sst_total": sst_total,
+            "sst_correct": sst_correct,
+            "sst_percent": sst_percent,
+        }
+
+    def _format_mean_error_overlay_text(self, performance):
+        stats = performance["normal_stats"]
+        mean_text = f"{stats['mean']:.2f} ms" if stats and np.isfinite(stats.get("mean", np.nan)) else "--"
+        normal_percent = performance["normal_percent"]
+        sst_percent = performance["sst_percent"]
+        normal_text = f"{normal_percent:.1f}%" if np.isfinite(normal_percent) else "--"
+        sst_text = f"{sst_percent:.1f}%" if np.isfinite(sst_percent) else "--"
+
+        return (
+            f"Средняя ошибка: {mean_text}\n"
+            f"Обычные в limits: {normal_text} "
+            f"({performance['normal_in_limits']}/{performance['normal_total']})\n"
+            f"SST без движения: {sst_text} "
+            f"({performance['sst_correct']}/{performance['sst_total']})"
+        )
+
     def _save_current_distribution_plot(self):
         csv_path = self._current_results_csv_path if self._current_results_csv_path else self._find_results_csv_path()
         df = self._load_results_df(csv_path)
         if df is None:
             return None
+        normal_df, _ = self._split_sst_results_df(df)
 
         output_dir = os.path.dirname(os.path.abspath(csv_path)) if csv_path else os.path.abspath("data")
         os.makedirs(output_dir, exist_ok=True)
@@ -360,7 +429,7 @@ class StimuliControlPanel(QFrame):
         try:
             acceptable_limit = abs(self.settings.delay_limit[0]) if self.settings.delay_limit else 200
             return save_error_distribution_plot(
-                df,
+                normal_df,
                 output_path,
                 acceptable_limit=acceptable_limit,
                 transparent=True,
@@ -390,7 +459,29 @@ class StimuliControlPanel(QFrame):
             pw.hide_mean_error()
             return True
 
-        stats = self.get_current_results_stats()
+        csv_path = self._current_results_csv_path if self._current_results_csv_path else self._find_results_csv_path()
+        df = self._load_results_df(csv_path)
+        performance = self._calculate_performance_stats(df)
+        if (
+            performance is None
+            or (performance["normal_total"] <= 0 and performance["sst_total"] <= 0)
+        ):
+            self.label_results_stats.setText("Результаты: --")
+            return False
+
+        stats = performance["normal_stats"]
+        summary_text = self._format_mean_error_overlay_text(performance)
+        self.label_results_stats.setText(format_error_statistics(stats))
+        if not isinstance(pw, QWidget) or pw.isHidden():
+            return False
+        mean = stats["mean"] if stats and np.isfinite(stats.get("mean", np.nan)) else np.nan
+        pw.show_mean_error(
+            mean,
+            plot_path=self._save_current_distribution_plot(),
+            text=summary_text,
+        )
+        return True
+
         if stats is None or stats.get("n", 0) <= 0 or not np.isfinite(stats.get("mean", np.nan)):
             self.label_results_stats.setText("Результаты: --")
             return False
