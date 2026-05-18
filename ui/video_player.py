@@ -1074,8 +1074,8 @@ class StimuliPresentation_one_by_one(QWidget):
         trial_id = self._active_trial_id if trial_id is None else trial_id
         if not self._current_trial(run_id, trial_id):
             return  # больше ничего не делаем
-        # if not self._last_frame_ready:
-        #     self._capture_last_frame_from_screen()
+        if not self._last_frame_ready:
+            self._capture_last_frame_from_screen()
         self._awaiting_first_frame = False
         self._video_playback_active = False
         self._player.pause()  # или не stop; главное не давать VLC очистить окно
@@ -1142,6 +1142,8 @@ class StimuliPresentation_one_by_one(QWidget):
         graph.show_label = status
     
     def _update_feedback_bar(self, graph, value):
+        if hasattr(graph, "set_cross_label"):
+            graph.set_cross_label(False)
         if np.isfinite(value):
             status = True
             graph.set_triangle_params(vertex_x=value)
@@ -1169,18 +1171,12 @@ class StimuliPresentation_one_by_one(QWidget):
         return bool(np.any(~np.isnan(self.delay_value)))
 
     def _show_sst_movement_feedback_mode(self):
-        self._background_label.hide()
-        self._hide_feedback_bar_mode()
-        self._hide_feedback_plot_widgets()
-        if hasattr(self, "_video_placeholder"):
-            self._video_placeholder.hide()
-        if hasattr(self, "_last_frame_label"):
-            self._last_frame_label.hide()
-
-        self._sst_feedback_widget.setGeometry(self._feedback_widget.rect())
-        self._sst_feedback_widget.show()
-        self._sst_feedback_widget.raise_()
-        self._stacked.setCurrentIndex(1)
+        self._feedback_bar.set_triangle_params(vertex_x=0)
+        self._feedback_bar.set_cross_label(True)
+        self._feedback_bar.show_triangle = False
+        self._feedback_bar.show_measure_line = False
+        self._feedback_bar.show_label = True
+        self._show_feedback_bar_mode()
         
 
     def _check_feedback(self):

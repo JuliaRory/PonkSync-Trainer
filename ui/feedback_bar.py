@@ -61,6 +61,7 @@ class FeedbackBar(QWidget):
         self.vertex_x = 0
         self.triangle_color = get_error_color(0)
         self.text_color = get_text_color(0)
+        self.show_cross_label = False
 
         self.show_triangle = True
         self.show_measure_line = True
@@ -75,6 +76,10 @@ class FeedbackBar(QWidget):
             
             self.triangle_color = get_error_color(vertex_x)
             self.text_color = get_text_color(vertex_x)
+        self.update()
+
+    def set_cross_label(self, enabled):
+        self.show_cross_label = bool(enabled)
         self.update()
 
     def paintEvent(self, event):
@@ -109,13 +114,25 @@ class FeedbackBar(QWidget):
         center_x = self.width() // 2 + self._zero_offset_px + int(coef * self.vertex_x)-20
         center_y = self.height() // 2
 
+        painter.setFont(QFont("Arial", 30, QFont.Bold))
+        text_y = center_y - self._rect_height // 2 - self._label_offset_y
+
+        if self.show_cross_label:
+            center_x = self.width() // 2
+            metrics = painter.fontMetrics()
+            cross_size = max(28, metrics.height() - 8)
+            cross_center_y = text_y - metrics.ascent() // 2 + metrics.descent() // 2
+            half = cross_size // 2
+            painter.setPen(QPen(QColor(255, 0, 0), 8, Qt.SolidLine, Qt.RoundCap))
+            painter.drawLine(center_x - half, cross_center_y - half, center_x + half, cross_center_y + half)
+            painter.drawLine(center_x + half, cross_center_y - half, center_x - half, cross_center_y + half)
+            return
+
         label = f"{self.vertex_x}"
         text_width = painter.fontMetrics().horizontalAdvance(label)
         text_x = center_x - text_width // 2
-        text_y = center_y - self._rect_height // 2 - self._label_offset_y
 
         painter.setPen(self.text_color)
-        painter.setFont(QFont("Arial", 30, QFont.Bold))
         painter.drawText(text_x, text_y, label)
 
 
