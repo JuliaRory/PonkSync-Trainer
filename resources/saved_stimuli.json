@@ -1,4 +1,19 @@
 {   
+    "EconoMI_bar_25-50_rest_vs_motor_1":{
+        "set": {
+            "1": "animatedSingle1500_tms_0ms_nosounds_bar.mkv", 
+            "2": "animatedSingle1500_tms_0ms_nosounds_bar.mkv",
+            "3": "rest1500_tms_0ms_bar.mkv",
+            "4": "audio_countdown_3.mkv"
+        },
+        "order": [
+            4,1,1,3,1,3,2,2,3,3,2,2,1,2,1,3,3,2,3,2,2,3,1,1,3,3,1,2,2,1,1,2,2,1,1,2,2,3,3,1,2,1,3,1,3,3,1,1,2,2,3,2,3,3,1,1,3,2,1,2,3,3,2,3,1,1,3,3,2,1,1,2,3,2,2,1
+        ],
+        "cross": {
+            "dur_ms": 3000,
+            "filename": "cross_image_white_photomark.png"
+        }
+    },
     "bar_10-30_rest_vs_motor_1":{
         "set": {
             "1": "animatedSingle1500_tms_0ms_nosounds_bar.mkv", 

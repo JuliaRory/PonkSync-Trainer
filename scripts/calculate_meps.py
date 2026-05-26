@@ -68,6 +68,13 @@ def _calculate_mep(epoch, time, from_ms=15, upto_ms=40):
     return float(np.nanmax(data) - np.nanmin(data))
 
 
+def _epoch_amp_stats(epochs, time):
+    if epochs.size == 0:
+        return np.nan, np.nan
+    amps = np.asarray([_calculate_mep(epoch, time) for epoch in epochs], dtype=float)
+    return float(np.nanmean(amps)), float(np.nanstd(amps, ddof=1 if amps.size > 1 else 0))
+
+
 def _baseline_correction(epochs, time, from_ms=-20, to_ms=-5):
     mask = np.where((time > from_ms) & (time < to_ms))[0]
     baseline_mean = np.mean(epochs[:, mask], axis=1)
@@ -83,6 +90,15 @@ def _decode_stimulus_message(message):
         return None
     stimulus = data.get("stimulus") if isinstance(data, dict) else None
     return str(stimulus) if stimulus else None
+
+
+def _stimulus_label_from_name(stimulus):
+    name = os.path.basename(str(stimulus)).lower()
+    if "rest" in name:
+        return 2
+    if "countdown" in name or "cross" in name:
+        return None
+    return 1
 
 
 def _trigger_events_and_block_timestamps(h5f, bit):
@@ -112,23 +128,29 @@ def _stimulus_labels_from_stream(h5f, events, event_timestamps):
 
     messages = h5f["stimuli/messages"][:]
     stimuli = []
+    ignored_count = 0
     for row in messages:
         stimulus = _decode_stimulus_message(row["message"])
         if stimulus is None:
             continue
+        label = _stimulus_label_from_name(stimulus)
+        if label is None:
+            ignored_count += 1
+            continue
         stimuli.append({
             "received": float(row["received"]),
             "stimulus": stimulus,
-            "label": 2 if "rest" in stimulus.lower() else 1,
+            "label": label,
         })
 
     n_events = len(events)
-    n_stimuli_original = len(stimuli)
-    if n_stimuli_original == n_events + 1:
+    n_messages = len(messages)
+    n_trial_stimuli = len(stimuli)
+    if n_trial_stimuli == n_events + 1:
         stimuli = stimuli[1:]
-    elif n_stimuli_original != n_events:
+    elif n_trial_stimuli != n_events:
         warnings.append(
-            f"Stimuli count ({n_stimuli_original}) does not match trigger events ({n_events}) on the selected bit."
+            f"Trial stimuli count ({n_trial_stimuli}) does not match trigger events ({n_events}) on the selected bit."
         )
 
     if not stimuli:
@@ -149,14 +171,41 @@ def _stimulus_labels_from_stream(h5f, events, event_timestamps):
     return {
         "seq": np.asarray(labels, dtype=int),
         "source": "stimuli stream",
-        "stimuli_count": n_stimuli_original,
+        "stimuli_count": n_trial_stimuli,
+        "stimuli_message_count": n_messages,
+        "ignored_stimuli_count": ignored_count,
         "trigger_count": n_events,
         "matched_stimuli": matched_stimuli,
         "warnings": warnings,
     }, warnings
 
 
-def calculate_mep_amp(filename_path, bit, seq=None, return_info=False):
+def _sequence_from_source(seq, stream_info, sequence_source):
+    source_key = str(sequence_source or "auto").lower()
+    if source_key not in {"auto", "stimuli", "stream", "seq", "sequence"}:
+        raise ValueError(f"Unknown MEP sequence source: {sequence_source!r}.")
+
+    if source_key in {"stimuli", "stream"}:
+        if stream_info is None:
+            raise ValueError("Stimuli stream was requested, but no usable stimuli stream was found in HDF.")
+        return stream_info["seq"], stream_info["source"], [], True
+
+    if source_key in {"seq", "sequence"}:
+        if seq is None:
+            raise ValueError("Manual sequence was requested, but no seq was provided.")
+        return _clean_sequence(seq), "manual seq", [], False
+
+    if stream_info is not None:
+        return stream_info["seq"], stream_info["source"], [], True
+
+    if seq is None:
+        raise ValueError("No usable stimuli stream was found, and no fallback sequence was provided.")
+    return _clean_sequence(seq), "manual seq fallback", [
+        "No usable stimuli stream was found in HDF. Falling back to the provided sequence."
+    ], False
+
+
+def calculate_mep_amp(filename_path, bit, seq=None, return_info=False, sequence_source="auto"):
     import h5py
 
     with h5py.File(filename_path, "r") as h5f:
@@ -164,16 +213,9 @@ def calculate_mep_amp(filename_path, bit, seq=None, return_info=False):
         stream_info, stream_warnings = _stimulus_labels_from_stream(h5f, events, event_timestamps)
 
     emg = data[:, 0]
-    warnings = list(stream_warnings)
-    if stream_info is not None:
-        seq = stream_info["seq"]
-        source = stream_info["source"]
-    else:
-        if seq is None:
-            raise ValueError("No stimuli stream was found, and no fallback sequence was provided.")
-        warnings.append("No stimuli stream was found in HDF. Falling back to the selected saved sequence.")
-        seq = _clean_sequence(seq)
-        source = "saved sequence fallback"
+    seq, source, source_warnings, uses_stream = _sequence_from_source(seq, stream_info, sequence_source)
+    warnings = list(stream_warnings) if uses_stream else []
+    warnings.extend(source_warnings)
 
     start = ms_to_samples(-20)
     end = ms_to_samples(60)
@@ -214,6 +256,8 @@ def calculate_mep_amp(filename_path, bit, seq=None, return_info=False):
         "warnings": warnings,
         "trigger_count": int(len(events)),
         "stimuli_count": None if stream_info is None else int(stream_info["stimuli_count"]),
+        "stimuli_message_count": None if stream_info is None else int(stream_info["stimuli_message_count"]),
+        "ignored_stimuli_count": None if stream_info is None else int(stream_info["ignored_stimuli_count"]),
         "motor_count": int(bas_motor_epochs.shape[0]),
         "rest_count": int(bas_rest_epochs.shape[0]),
     }
@@ -222,11 +266,27 @@ def calculate_mep_amp(filename_path, bit, seq=None, return_info=False):
     return time, bas_motor_epochs, bas_rest_epochs
 
 
-def run(subject, to_analysis):
+def run(subject, to_analysis, bit=2, sequence_source="auto"):
     for record in to_analysis:
         filename_path = os.path.join("./data", subject, record["record"])
         print(f"-----Испытуемый {subject}, запись {record['record']}-----")
-        time, motor_epochs, rest_epochs = calculate_mep_amp(filename_path, 2, record["seq"])
+        record_bit = int(record.get("bit", bit))
+        record_sequence_source = record.get("sequence_source", sequence_source)
+        time, motor_epochs, rest_epochs, info = calculate_mep_amp(
+            filename_path,
+            record_bit,
+            record.get("seq"),
+            return_info=True,
+            sequence_source=record_sequence_source,
+        )
+        print(
+            f"Источник разметки: {info['source']}; bit {record_bit}; "
+            f"motor: {info['motor_count']}, rest: {info['rest_count']}."
+        )
+        for warning in info.get("warnings", []):
+            print(f"WARNING: {warning}")
+        motor_mean_amp, motor_std_amp = _epoch_amp_stats(motor_epochs, time)
+        rest_mean_amp, rest_std_amp = _epoch_amp_stats(rest_epochs, time)
 
         plot_all_epochs(
             time,
@@ -234,7 +294,11 @@ def run(subject, to_analysis):
             rest_epochs,
             record["motor_label"],
             "rest",
-            f"{subject}: {record['motor_label']} vs rest, {record['power']}",
+            (
+                f"{subject}, {record['power']}\n"
+                f"motor: {motor_mean_amp:.2f} ± {motor_std_amp:.2f} mV; "
+                f"rest: {rest_mean_amp:.2f} ± {rest_std_amp:.2f} mV"
+            ),
             os.path.join("data", subject, f"{record['record']}_mep_plot.png"),
         )
 

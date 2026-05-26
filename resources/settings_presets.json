@@ -70,5 +70,14 @@
     "isi_max_s": 3.0,
     "saved_stimuli_curr": "bar_10-30_rest_vs_motor_4",
     "record": true
+  }, 
+  "SST_training": {
+    "stimuli_curr": 1, 
+    "feedback_mode_curr": 2,
+    "stimuli_inf": false,
+    "stimuli_n": 40,
+    "isi_min_s": 2.0,
+    "isi_max_s": 3.0,
+    "record": true
   }
 }
