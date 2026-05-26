@@ -1,5 +1,6 @@
 {
   "no feedback - 15": {
+    "stimuli_curr": 0, 
     "feedback_mode_curr": 3,
     "stimuli_inf": false,
     "stimuli_n": 15,
@@ -8,6 +9,7 @@
     "record": true
   },
   "feedback - 25": {
+    "stimuli_curr": 0, 
     "feedback_mode_curr": 0,
     "stimuli_inf": false,
     "stimuli_n": 25,
@@ -16,6 +18,7 @@
     "record": true
   },
   "feedback - 40": {
+    "stimuli_curr": 0, 
     "feedback_mode_curr": 0,
     "stimuli_inf": false,
     "stimuli_n": 40,
@@ -24,6 +27,7 @@
     "record": true
   },
   "error feedback - 40": {
+    "stimuli_curr": 0, 
     "feedback_mode_curr": 2,
     "stimuli_inf": false,
     "stimuli_n": 40,
@@ -32,6 +36,7 @@
     "record": true
   },
   "no feedback - 30": {
+    "stimuli_curr": 0, 
     "feedback_mode_curr": 3,
     "stimuli_inf": false,
     "stimuli_n": 30,
@@ -74,10 +79,19 @@
   "SST_training": {
     "stimuli_curr": 1, 
     "feedback_mode_curr": 2,
-    "stimuli_inf": false,
-    "stimuli_n": 40,
+    "sequence_mode": true,
     "isi_min_s": 2.0,
     "isi_max_s": 3.0,
+    "saved_stimuli_curr": "bar_30-15_SST",
+    "record": true
+  },
+  "SST_test": {
+    "stimuli_curr": 1, 
+    "feedback_mode_curr": 3,
+    "sequence_mode": true,
+    "isi_min_s": 2.0,
+    "isi_max_s": 3.0,
+    "saved_stimuli_curr": "bar_20-10_SST",
     "record": true
   }
 }
