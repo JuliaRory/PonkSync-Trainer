@@ -16,6 +16,7 @@ class StimuliSettings:
     SST_video: str = "animatedSingle1500_stop-200ms_tms_0ms_nosounds_bar.mkv"
 
     bar_figure: str = "bar_figure.png"
+
     
     stimuli: List[str] = field(default_factory=lambda: ["Одиночные", "Одиночные SST", "Триплеты", "Триплеты SST"])
     stimuli_type: List[str] = field(default_factory=lambda: ["Круг", "Вертикальный бар", "Горизонтальный бар"])

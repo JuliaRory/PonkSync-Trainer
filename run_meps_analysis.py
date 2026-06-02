@@ -7,16 +7,16 @@ seq2 = np.asarray([1,2,1,1,1,2,1,1,1,2,1,1,2,1,1,2,1,1,1,1,2,1,1,1,2,1,2,1,1,1,1
 seq3 = np.asarray([1,1,1,1,1,2,1,1,1,2,1,2,1,1,1,2,1,1,2,1,1,1,1,2,1,1,1,2,1,1,2,1,1,2,1,1,1,1,1,2])
 seq4 = np.asarray([1,2,1,1,1,1,1,1,2,1,1,2,1,1,2,1,1,1,1,2,1,2,1,1,1,2,1,1,2,1,1,1,1,2,1,2,1,1,1,1])
 
-subject = "15SZ"
-power_quasi = 43
-power_supthr = 52
+subject = "16ED"
+power_quasi = 47
+power_supthr = 57
 
 def get_numbers(number=1):
     if number < 10:
         return f"0{number}"
     return str(number)
 
-first_number = 6
+first_number = 7
 trigger_bit = 0
 
 # Source of motor/rest labels:
