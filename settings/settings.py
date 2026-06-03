@@ -93,6 +93,7 @@ class DetectionSettings:
     window_ms:  List[int] = field(default_factory=lambda: [-500, 375])
     threshold: int = 4
     threshold_mv: float = 0.5
+    relax: bool = False
     thr_adaptive: bool = False
     baseline_ms: int = 250
     n_sd: int = 15

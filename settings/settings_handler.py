@@ -63,6 +63,7 @@ class SettingsHandler:
         self._peak_panel.spin_box_threshold_curr.valueChanged[float].connect(self._update_threshold)
         self._peak_panel.spin_box_threshold_mv.valueChanged[float].connect(self._update_threshold_mv)
         self._peak_panel.spin_box_bit.valueChanged[int].connect(self._update_bit)
+        self._peak_panel.check_box_relax.stateChanged.connect(self._update_relax)
 
 
         self._stimuli_panel.combo_box_stimuli.currentIndexChanged[int].connect(self._update_stimuli)
@@ -114,6 +115,9 @@ class SettingsHandler:
 
     def _update_bit(self, bit):
         self.settings.detection_settings.bit = bit
+
+    def _update_relax(self, status):
+        self.settings.detection_settings.relax = bool(status)
 
     def _update_threshold_mv(self, thr):
         print("mv", thr)
@@ -320,6 +324,7 @@ class SettingsHandler:
             (self._peak_panel.spin_box_threshold_mv, s.threshold_mv),
             (self._peak_panel.spin_box_threshold_curr, s.threshold),
             (self._peak_panel.spin_box_bit, s.bit),
+            (self._peak_panel.check_box_relax, s.relax),
         ]
         for widget, value in widget_values:
             self._set_widget_value(widget, value)

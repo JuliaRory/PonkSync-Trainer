@@ -36,6 +36,7 @@ class PeakDetectionPanel(QFrame):
         self.spin_box_threshold_curr = create_spin_box(0, 100000, s.threshold, data_type="float", step=0.25)
 
         self.label_units = QLabel("...")
+        self.check_box_relax = create_check_box(s.relax, "relax", parent=self)
 
         self.spin_box_bit = create_spin_box(0, 8, s.bit, parent=self)
         # self.spin_box_min_value = create_spin_box(-100, 100, s.ymin, parent=self)
@@ -50,6 +51,7 @@ class PeakDetectionPanel(QFrame):
         layout.addLayout(create_hbox([QLabel("Окно детекции")]))
         layout.addLayout(create_hbox([QLabel("от"), self.spin_box_window_from, QLabel("до"), self.spin_box_window_until, QLabel("мс")]))
         layout.addLayout(create_hbox([QLabel("Порог"), self.spin_box_threshold_curr, self.label_units]))
+        layout.addWidget(self.check_box_relax)
 
         layout.addLayout(create_hbox([QLabel("Бит"), self.spin_box_bit]))
 

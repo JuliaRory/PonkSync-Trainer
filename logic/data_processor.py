@@ -158,6 +158,17 @@ class DataProcessor(QObject):
         else:
             threshold = s.threshold * (10 ** self.settings.plot_settings.scale_factor)
         return threshold
+
+    def _find_threshold_crossings(self, x, threshold):
+        if self.settings.detection_settings.relax:
+            active_idxs = np.where(x < threshold)[0]
+            crossing_idxs = np.where((x[1:] < threshold) & (x[:-1] >= threshold))[0] + 1
+            if len(active_idxs) > 0 and active_idxs[0] == 0:
+                crossing_idxs = np.insert(crossing_idxs, 0, 0)
+            return active_idxs, crossing_idxs
+
+        active_idxs = np.where(x > threshold)[0]
+        return active_idxs, active_idxs
     
     # === ponk detection ===
     def process_ponk(self):
@@ -177,7 +188,7 @@ class DataProcessor(QObject):
             threshold = self._define_thr(x)
             # self.logger.info(f"Threshold is {threshold}.")
 
-            crossings = np.where(x > threshold)[0]      # находим есть ли эмг выше порога
+            active_idxs, crossings = self._find_threshold_crossings(x, threshold)
             
             delay = np.nan
             if len(crossings) > 0:
@@ -189,9 +200,9 @@ class DataProcessor(QObject):
 
                 onset_time = self.ts[idx+mask[0]] # момент времени
                 delay = onset_time - self._trigger
-                duration = len(crossings)
+                duration = len(active_idxs)
 
-                amp = np.max(x[crossings])
+                amp = np.min(x[active_idxs]) if s.relax else np.max(x[active_idxs])
 
                 self.delayValue.emit(int(delay))        # --> to show immediate feedback
 
@@ -214,7 +225,8 @@ class DataProcessor(QObject):
                     'amplitude': np.nan
                 }
 
-            data["mode"] = "TKEO" if self.settings.processing_settings.tkeo else "EMG"
+            signal_mode = "TKEO" if self.settings.processing_settings.tkeo else "EMG"
+            data["mode"] = f"{signal_mode} relax" if s.relax else signal_mode
             data['threshold'] = threshold
             stimulus_filename = self._trigger_stimulus_filename or getattr(
                 self.settings.stimuli_settings, "current_stimulus_filename", ""
