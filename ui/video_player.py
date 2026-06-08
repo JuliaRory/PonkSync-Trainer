@@ -104,6 +104,11 @@ class StimuliPresentation_one_by_one(QWidget):
         self._awaiting_feedback_trial_id = None
         self._feedback_trial_id = None
         self._feedback_rendering_trial_id = None
+        self._relax_gate_ready = False
+        self._waiting_for_relax_gate = False
+        self._relax_gate_cross_elapsed = False
+        self._relax_gate_run_id = None
+        self._relax_gate_trial_id = None
         self._marker_visible_during_current_video = False
         self._video_playback_active = False
         self._last_frame_ready = False
@@ -959,6 +964,11 @@ class StimuliPresentation_one_by_one(QWidget):
         self.show_delay = False
         self._last_frame_ready = False
         self._clear_last_frame_background(remove_file=True)
+        self._relax_gate_ready = False
+        self._waiting_for_relax_gate = False
+        self._relax_gate_cross_elapsed = False
+        self._relax_gate_run_id = None
+        self._relax_gate_trial_id = None
         self._awaiting_feedback = False
         self._awaiting_feedback_trial_id = None
         self._feedback_trial_id = None
@@ -1269,6 +1279,48 @@ class StimuliPresentation_one_by_one(QWidget):
         self._feedback_rendering_trial_id = None
         self._show_cross()
 
+    def _relax_gate_enabled(self):
+        return bool(getattr(self.settings, "relax_gate_enabled", False))
+
+    def set_relax_gate_enabled(self, enabled):
+        self.settings.relax_gate_enabled = bool(enabled)
+        if not enabled and self._waiting_for_relax_gate:
+            self._relax_gate_ready = True
+            if self._relax_gate_cross_elapsed:
+                self._play_next_after_relax_gate_ready()
+
+    def notify_relax_gate_ready(self):
+        self._relax_gate_ready = True
+        if self._waiting_for_relax_gate and self._relax_gate_cross_elapsed:
+            self._play_next_after_relax_gate_ready()
+
+    def _try_play_next_after_relax_gate(self, run_id, trial_id):
+        if run_id is None or trial_id is None:
+            return
+        if not self._current_trial(run_id, trial_id):
+            return
+        self._relax_gate_cross_elapsed = True
+        if self._is_paused:
+            return
+        if not self._relax_gate_ready:
+            return
+
+        self._play_next_after_relax_gate_ready()
+
+    def _play_next_after_relax_gate_ready(self):
+        run_id = self._relax_gate_run_id
+        trial_id = self._relax_gate_trial_id
+        if run_id is None or trial_id is None:
+            return
+        if not self._current_trial(run_id, trial_id) or self._is_paused:
+            return
+
+        self._waiting_for_relax_gate = False
+        self._relax_gate_cross_elapsed = False
+        self._relax_gate_run_id = None
+        self._relax_gate_trial_id = None
+        self._play_next_video()
+
     
     def _show_cross(self):
         if self._stopped:
@@ -1285,7 +1337,19 @@ class StimuliPresentation_one_by_one(QWidget):
         self._show_marker()
         if not self._is_paused:
             self._cross_dur_ms = self._next_cross_duration_ms()
-            self._schedule(self._cross_dur_ms, self._play_next_video, run_id, trial_id)
+            if self._relax_gate_enabled():
+                self._waiting_for_relax_gate = True
+                self._relax_gate_cross_elapsed = False
+                self._relax_gate_run_id = run_id
+                self._relax_gate_trial_id = trial_id
+                self._schedule(
+                    self._cross_dur_ms,
+                    lambda: self._try_play_next_after_relax_gate(run_id, trial_id),
+                    run_id,
+                    trial_id,
+                )
+            else:
+                self._schedule(self._cross_dur_ms, self._play_next_video, run_id, trial_id)
         else:
             self._schedule(250, self._show_cross, run_id, trial_id)
 
@@ -1439,6 +1503,8 @@ class StimuliPresentation_one_by_one(QWidget):
                 self._player.play()
             self._is_paused = False
             self.stimuliPaused.emit()
+            if self._waiting_for_relax_gate and self._relax_gate_ready and self._relax_gate_cross_elapsed:
+                self._play_next_after_relax_gate_ready()
 
     def pause_video(self):
         # управление внешней кнопкой 

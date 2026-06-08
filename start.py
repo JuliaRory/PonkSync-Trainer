@@ -31,10 +31,13 @@ if __name__ == "__main__":
     driver.inputDataStream("data", dispatcher_data)                             # создание входного потока данных типа Stream
     dispatcher_message = CallDispatcher()                                         # пустая функция-обработчик
     driver.inputMessageStream("message", dispatcher_message)                             # создание входного потока данных типа Stream
+    dispatcher_tension_wait = CallDispatcher()
+    driver.inputMessageStream("tension_wait", dispatcher_tension_wait)
 
     output_stream = driver.outputMessageStream("controlSignal")           # создание выходного потока данных типа Message
     output_stream_ponk = driver.outputMessageStream("ponk_data")         # создание выходного потока данных типа Message
     output_stream_stimuli = driver.outputMessageStream("stimuli")
+    output_stream_tension_on = driver.outputMessageStream("tension_on")
     resonance = ResonanceAppProxy(output_stream)                          # Создаем прокси резонанса
 
     # driver.loadConfig(r'streamDataSimulator__to__PonkSync.json')       # вгрузить настройки с потоком в резонансе
@@ -43,7 +46,15 @@ if __name__ == "__main__":
 
     # == Запуск приложения ==
 
-    window  = MainWindow(dispatcher_data, dispatcher_message, output_stream_ponk, output_stream_stimuli, resonance)   # open main window
+    window  = MainWindow(
+        dispatcher_data,
+        dispatcher_message,
+        output_stream_ponk,
+        output_stream_stimuli,
+        resonance,
+        dispatcher_tension_wait,
+        output_stream_tension_on,
+    )   # open main window
     window.show()
     
     sys.exit(app.exec_())

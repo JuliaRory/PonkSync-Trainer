@@ -37,6 +37,12 @@ class PeakDetectionPanel(QFrame):
 
         self.label_units = QLabel("...")
         self.check_box_relax = create_check_box(s.relax, "relax", parent=self)
+        self.check_box_relax_gate = create_check_box(s.relax_gate_enabled, "ждать напр.", parent=self)
+        self.spin_box_relax_window_ms = create_spin_box(1, 1000, s.relax_window_ms, parent=self)
+        self.spin_box_relax_gate_window_ms = create_spin_box(1, 2000, s.relax_gate_window_ms, parent=self)
+        self._update_relax_widgets()
+        self.check_box_relax.stateChanged.connect(lambda _: self._update_relax_widgets())
+        self.check_box_relax_gate.stateChanged.connect(lambda _: self._update_relax_widgets())
 
         self.spin_box_bit = create_spin_box(0, 8, s.bit, parent=self)
         # self.spin_box_min_value = create_spin_box(-100, 100, s.ymin, parent=self)
@@ -52,6 +58,9 @@ class PeakDetectionPanel(QFrame):
         layout.addLayout(create_hbox([QLabel("от"), self.spin_box_window_from, QLabel("до"), self.spin_box_window_until, QLabel("мс")]))
         layout.addLayout(create_hbox([QLabel("Порог"), self.spin_box_threshold_curr, self.label_units]))
         layout.addWidget(self.check_box_relax)
+        layout.addLayout(create_hbox([QLabel("Окно relax"), self.spin_box_relax_window_ms, QLabel("мс")]))
+        layout.addWidget(self.check_box_relax_gate)
+        layout.addLayout(create_hbox([QLabel("Окно напр."), self.spin_box_relax_gate_window_ms, QLabel("мс")]))
 
         layout.addLayout(create_hbox([QLabel("Бит"), self.spin_box_bit]))
 
@@ -62,4 +71,10 @@ class PeakDetectionPanel(QFrame):
         layout.setSpacing(0)  # убираем промежутки между виджетами
         layout.addStretch()
 
+    def _update_relax_widgets(self):
+        relax_enabled = self.check_box_relax.isChecked()
+        gate_enabled = relax_enabled and self.check_box_relax_gate.isChecked()
+        self.spin_box_relax_window_ms.setEnabled(relax_enabled)
+        self.check_box_relax_gate.setEnabled(relax_enabled)
+        self.spin_box_relax_gate_window_ms.setEnabled(gate_enabled)
 

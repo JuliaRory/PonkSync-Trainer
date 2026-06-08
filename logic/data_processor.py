@@ -38,8 +38,9 @@ class DataProcessor(QObject):
 
     delayValue = pyqtSignal(int)
     delayValues = pyqtSignal(object)    # --> main_window --> stimuli_panel --> video_player
+    relaxGateReady = pyqtSignal()
  
-    def __init__(self, settings, output_stream_ponk):
+    def __init__(self, settings, output_stream_ponk, output_stream_tension_on=None):
         super().__init__()
         self.settings = settings    # settings
         # self.logger = logging.getLogger(__name__)
@@ -47,6 +48,7 @@ class DataProcessor(QObject):
         self.logger.set_output_stream(output_stream_ponk)
 
         self.output_stream_ponk = output_stream_ponk
+        self.output_stream_tension_on = output_stream_tension_on
 
         # для хранения данных
         time_range_ms = self.settings.plot_settings.time_range_ms
@@ -67,6 +69,9 @@ class DataProcessor(QObject):
         self._feedback_cursor = 0
         self._pending_feedback_requests = 0
         self._feedback_counter = 0  # для показа N усреднённого фидбэка
+
+        self._relax_gate_waiting = False
+        self._tension_waiting = False
 
         self._pending_mep_triggers = []
         self._mep_recording = False
@@ -97,6 +102,8 @@ class DataProcessor(QObject):
         self._pending_feedback_requests = 0
         self._trigger = None
         self._trigger_stimulus_filename = ""
+        self._relax_gate_waiting = False
+        self._tension_waiting = False
 
     def start_mep_recording(self, hdf_path):
         self._mep_hdf_path = hdf_path
@@ -149,6 +156,8 @@ class DataProcessor(QObject):
         self.newDataProcessed.emit()        # --> plot_updater
         if self._trigger is not None:
             self.process_ponk()
+        self._check_relax_gate_ready()
+        self._check_tension_wait_ready()
 
     def _define_thr(self, x):
         s = self.settings.detection_settings
@@ -159,16 +168,86 @@ class DataProcessor(QObject):
             threshold = s.threshold * (10 ** self.settings.plot_settings.scale_factor)
         return threshold
 
+    def _relax_window_samples(self):
+        window_ms = max(1, int(self.settings.detection_settings.relax_window_ms))
+        return max(1, int(round(window_ms * self.settings.Fs / 1000)))
+
+    def _find_relax_threshold_crossings(self, x, threshold):
+        window_samples = self._relax_window_samples()
+        if len(x) < window_samples:
+            return np.array([], dtype=int), np.array([], dtype=int)
+
+        kernel = np.ones(window_samples) / window_samples
+        window_means = np.convolve(x, kernel, mode="valid")
+        window_active = window_means < threshold
+        crossing_window_starts = np.where(
+            window_active & np.concatenate(([True], ~window_active[:-1]))
+        )[0]
+        crossing_idxs = crossing_window_starts + window_samples - 1
+
+        active_window_starts = np.where(window_active)[0]
+        if len(active_window_starts) == 0:
+            return np.array([], dtype=int), crossing_idxs
+
+        active_diff = np.zeros(len(x) + 1, dtype=int)
+        np.add.at(active_diff, active_window_starts, 1)
+        np.add.at(active_diff, active_window_starts + window_samples, -1)
+        active_idxs = np.where(np.cumsum(active_diff[:-1]) > 0)[0]
+        return active_idxs, crossing_idxs
+
     def _find_threshold_crossings(self, x, threshold):
         if self.settings.detection_settings.relax:
-            active_idxs = np.where(x < threshold)[0]
-            crossing_idxs = np.where((x[1:] < threshold) & (x[:-1] >= threshold))[0] + 1
-            if len(active_idxs) > 0 and active_idxs[0] == 0:
-                crossing_idxs = np.insert(crossing_idxs, 0, 0)
-            return active_idxs, crossing_idxs
+            return self._find_relax_threshold_crossings(x, threshold)
 
         active_idxs = np.where(x > threshold)[0]
         return active_idxs, active_idxs
+
+    def request_relax_gate(self):
+        if not self.settings.detection_settings.relax:
+            self.relaxGateReady.emit()
+            return
+
+        self._relax_gate_waiting = True
+        self._check_relax_gate_ready()
+
+    def _relax_gate_window_samples(self):
+        window_ms = max(1, int(self.settings.detection_settings.relax_gate_window_ms))
+        return max(1, int(round(window_ms * self.settings.Fs / 1000)))
+
+    def _relax_gate_threshold(self):
+        return self.settings.detection_settings.threshold * (10 ** self.settings.plot_settings.scale_factor)
+
+    def _tension_detected(self):
+        n_samples = self._relax_gate_window_samples()
+        if len(self.emg) < n_samples:
+            return False
+
+        x = np.asarray(self.emg, dtype=float)[-n_samples:]
+        if not np.all(np.isfinite(x)):
+            return False
+
+        return np.mean(x) > self._relax_gate_threshold()
+
+    def _check_relax_gate_ready(self):
+        if not self._relax_gate_waiting:
+            return
+
+        if self._tension_detected():
+            self._relax_gate_waiting = False
+            self.relaxGateReady.emit()
+
+    def request_tension_wait(self):
+        self._tension_waiting = True
+        self._check_tension_wait_ready()
+
+    def _check_tension_wait_ready(self):
+        if not self._tension_waiting:
+            return
+
+        if self._tension_detected():
+            self._tension_waiting = False
+            if self.output_stream_tension_on is not None:
+                self.output_stream_tension_on("tension")
     
     # === ponk detection ===
     def process_ponk(self):

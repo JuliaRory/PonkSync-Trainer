@@ -32,7 +32,18 @@ from utils.ui_helpers import create_button
 WIDTH_SET, HEIGHT_SET = 1400, 800
 
 class MainWindow(QWidget):
-    def __init__(self, input_data_stream, input_message_stream, output_stream_ponk, output_stream_stimuli, resonance):
+    tensionWaitRequested = pyqtSignal()
+
+    def __init__(
+        self,
+        input_data_stream,
+        input_message_stream,
+        output_stream_ponk,
+        output_stream_stimuli,
+        resonance,
+        input_tension_wait_stream=None,
+        output_stream_tension_on=None,
+    ):
         super().__init__()
         self.setWindowTitle("SyncPonk Trainer")
         # self.setWindowIcon(QIcon(r"./resources/icon.png"))
@@ -40,9 +51,10 @@ class MainWindow(QWidget):
         self._resonance = resonance                       # прокси для управления резонансными модулями
         self._output_stream_stimuli = output_stream_stimuli
         self.settings = Settings()                        # Хранилище настроек
+        self._input_tension_wait_stream = input_tension_wait_stream
 
         self._input_stream = StreamSource(input_data_stream, input_message_stream)                              # Приёмник (онлайн) данных
-        self._data_processor = DataProcessor(self.settings, output_stream_ponk)
+        self._data_processor = DataProcessor(self.settings, output_stream_ponk, output_stream_tension_on)
 
         if self.settings.activate_bat:
             # Запуск батника с qml-файлом для управления резонансными модулями
@@ -60,6 +72,8 @@ class MainWindow(QWidget):
         self._settings_handler = SettingsHandler(self.settings, self._data_processor, self._plot_updater, ui=self)
 
         self._setup_connections()
+        if self._input_tension_wait_stream is not None:
+            self._input_tension_wait_stream.set_callback(self._receive_tension_wait_message)
 
         self.resize(WIDTH_SET, HEIGHT_SET)
         self._finilaze()
@@ -125,7 +139,7 @@ class MainWindow(QWidget):
         self._data_processor.peakIdx.connect(lambda idx: self._plot_updater.plot_peak(idx))
 
         self._data_processor.delayValue[int].connect(lambda delay: self._process_delay(delay))
-        self._stimuli_panel.stimuliEnded.connect(lambda: self._data_processor.get_delays())
+        self._stimuli_panel.stimuliEnded.connect(self._on_stimulus_ended)
         self._stimuli_panel.changeFile.connect(lambda fl: self._data_processor.change_file(fl))
         self._stimuli_panel.recordingStarted.connect(self._on_mep_recording_started)
         self._stimuli_panel.recordingFinished.connect(lambda: self._data_processor.finish_mep_recording())
@@ -137,8 +151,19 @@ class MainWindow(QWidget):
         self._button_show_mean_error.clicked.connect(self._show_mean_error_on_video_player)
    
         self._data_processor.delayValues.connect(lambda delays: self._process_delays(delays))
+        self._data_processor.relaxGateReady.connect(self._stimuli_panel.notify_relax_gate_ready)
+        self.tensionWaitRequested.connect(self._data_processor.request_tension_wait)
 
     # logic
+
+    def _receive_tension_wait_message(self, msg, timestamp):
+        self.tensionWaitRequested.emit()
+
+    def _on_stimulus_ended(self):
+        self._data_processor.get_delays()
+        detection = self.settings.detection_settings
+        if detection.relax and detection.relax_gate_enabled:
+            self._data_processor.request_relax_gate()
 
     def _show_mep_window(self):
         if self._mep_window is None:

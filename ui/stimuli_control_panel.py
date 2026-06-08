@@ -277,6 +277,11 @@ class StimuliControlPanel(QFrame):
         print("--> show delay", values)
         self._player_window.show_feedback(values)
 
+    def notify_relax_gate_ready(self):
+        pw = getattr(self, "_player_window", None)
+        if isinstance(pw, QWidget) and not pw.isHidden():
+            pw.notify_relax_gate_ready()
+
     # === изменения состояния кнопок === 
     def _change_button_pause_stimuli_text(self):
         status = PLAY_LABEL if self._player_window.is_paused else STOP_LABEL

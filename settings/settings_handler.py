@@ -64,6 +64,9 @@ class SettingsHandler:
         self._peak_panel.spin_box_threshold_mv.valueChanged[float].connect(self._update_threshold_mv)
         self._peak_panel.spin_box_bit.valueChanged[int].connect(self._update_bit)
         self._peak_panel.check_box_relax.stateChanged.connect(self._update_relax)
+        self._peak_panel.check_box_relax_gate.stateChanged.connect(self._update_relax_gate_enabled)
+        self._peak_panel.spin_box_relax_window_ms.valueChanged[int].connect(self._update_relax_window_ms)
+        self._peak_panel.spin_box_relax_gate_window_ms.valueChanged[int].connect(self._update_relax_gate_window_ms)
 
 
         self._stimuli_panel.combo_box_stimuli.currentIndexChanged[int].connect(self._update_stimuli)
@@ -118,6 +121,17 @@ class SettingsHandler:
 
     def _update_relax(self, status):
         self.settings.detection_settings.relax = bool(status)
+        self._update_player_relax_gate_enabled()
+
+    def _update_relax_gate_enabled(self, status):
+        self.settings.detection_settings.relax_gate_enabled = bool(status)
+        self._update_player_relax_gate_enabled()
+
+    def _update_relax_window_ms(self, window_ms):
+        self.settings.detection_settings.relax_window_ms = int(window_ms)
+
+    def _update_relax_gate_window_ms(self, window_ms):
+        self.settings.detection_settings.relax_gate_window_ms = int(window_ms)
 
     def _update_threshold_mv(self, thr):
         print("mv", thr)
@@ -325,9 +339,14 @@ class SettingsHandler:
             (self._peak_panel.spin_box_threshold_curr, s.threshold),
             (self._peak_panel.spin_box_bit, s.bit),
             (self._peak_panel.check_box_relax, s.relax),
+            (self._peak_panel.check_box_relax_gate, s.relax_gate_enabled),
+            (self._peak_panel.spin_box_relax_window_ms, s.relax_window_ms),
+            (self._peak_panel.spin_box_relax_gate_window_ms, s.relax_gate_window_ms),
         ]
         for widget, value in widget_values:
             self._set_widget_value(widget, value)
+        self._peak_panel._update_relax_widgets()
+        self._update_player_relax_gate_enabled()
 
     def _sync_stimuli_ui_from_settings(self):
         s = self.settings.stimuli_settings
@@ -453,6 +472,14 @@ class SettingsHandler:
         if isinstance(pw, QWidget) and not pw.isHidden():
             self.ui._stimuli_panel._player_window.apply_sequence_settings()
             self.ui._stimuli_panel._player_window.set_video_path()
+
+    def _update_player_relax_gate_enabled(self):
+        s = self.settings.detection_settings
+        enabled = bool(s.relax and s.relax_gate_enabled)
+        self.settings.stimuli_settings.relax_gate_enabled = enabled
+        pw = getattr(self.ui._stimuli_panel, "_player_window", None)
+        if isinstance(pw, QWidget) and not pw.isHidden():
+            pw.set_relax_gate_enabled(enabled)
     
     def _update_monitor(self, n):
         self.settings.stimuli_settings.monitor = n

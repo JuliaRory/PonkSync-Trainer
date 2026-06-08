@@ -51,6 +51,7 @@ class StimuliSettings:
     feedback_bar_height_px: int = 150
     feedback_bar_scale_px: int = 610
     feedback_bar_scale_ms: int = 1500
+    relax_gate_enabled: bool = False
 
     subject: str = r"04KK"
     filename: str = r"test"
@@ -94,6 +95,9 @@ class DetectionSettings:
     threshold: int = 4
     threshold_mv: float = 0.5
     relax: bool = False
+    relax_window_ms: int = 50
+    relax_gate_enabled: bool = True
+    relax_gate_window_ms: int = 200
     thr_adaptive: bool = False
     baseline_ms: int = 250
     n_sd: int = 15
