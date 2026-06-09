@@ -37,6 +37,7 @@ class PeakDetectionPanel(QFrame):
 
         self.label_units = QLabel("...")
         self.check_box_relax = create_check_box(s.relax, "relax", parent=self)
+        self.check_box_show_relax_mean = create_check_box(s.show_relax_mean, "среднее relax", parent=self)
         self.check_box_relax_gate = create_check_box(s.relax_gate_enabled, "ждать напр.", parent=self)
         self.spin_box_relax_window_ms = create_spin_box(1, 1000, s.relax_window_ms, parent=self)
         self.spin_box_relax_gate_window_ms = create_spin_box(1, 2000, s.relax_gate_window_ms, parent=self)
@@ -59,6 +60,7 @@ class PeakDetectionPanel(QFrame):
         layout.addLayout(create_hbox([QLabel("Порог"), self.spin_box_threshold_curr, self.label_units]))
         layout.addWidget(self.check_box_relax)
         layout.addLayout(create_hbox([QLabel("Окно relax"), self.spin_box_relax_window_ms, QLabel("мс")]))
+        layout.addWidget(self.check_box_show_relax_mean)
         layout.addWidget(self.check_box_relax_gate)
         layout.addLayout(create_hbox([QLabel("Окно напр."), self.spin_box_relax_gate_window_ms, QLabel("мс")]))
 
@@ -75,6 +77,6 @@ class PeakDetectionPanel(QFrame):
         relax_enabled = self.check_box_relax.isChecked()
         gate_enabled = relax_enabled and self.check_box_relax_gate.isChecked()
         self.spin_box_relax_window_ms.setEnabled(relax_enabled)
+        self.check_box_show_relax_mean.setEnabled(relax_enabled)
         self.check_box_relax_gate.setEnabled(relax_enabled)
         self.spin_box_relax_gate_window_ms.setEnabled(gate_enabled)
-

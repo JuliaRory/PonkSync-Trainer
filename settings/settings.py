@@ -96,6 +96,7 @@ class DetectionSettings:
     threshold_mv: float = 0.5
     relax: bool = False
     relax_window_ms: int = 50
+    show_relax_mean: bool = False
     relax_gate_enabled: bool = True
     relax_gate_window_ms: int = 200
     thr_adaptive: bool = False

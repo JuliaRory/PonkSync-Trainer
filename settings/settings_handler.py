@@ -64,6 +64,7 @@ class SettingsHandler:
         self._peak_panel.spin_box_threshold_mv.valueChanged[float].connect(self._update_threshold_mv)
         self._peak_panel.spin_box_bit.valueChanged[int].connect(self._update_bit)
         self._peak_panel.check_box_relax.stateChanged.connect(self._update_relax)
+        self._peak_panel.check_box_show_relax_mean.stateChanged.connect(self._update_show_relax_mean)
         self._peak_panel.check_box_relax_gate.stateChanged.connect(self._update_relax_gate_enabled)
         self._peak_panel.spin_box_relax_window_ms.valueChanged[int].connect(self._update_relax_window_ms)
         self._peak_panel.spin_box_relax_gate_window_ms.valueChanged[int].connect(self._update_relax_gate_window_ms)
@@ -122,6 +123,11 @@ class SettingsHandler:
     def _update_relax(self, status):
         self.settings.detection_settings.relax = bool(status)
         self._update_player_relax_gate_enabled()
+        self._graph.update_relax_mean_line()
+
+    def _update_show_relax_mean(self, status):
+        self.settings.detection_settings.show_relax_mean = bool(status)
+        self._graph.update_relax_mean_line()
 
     def _update_relax_gate_enabled(self, status):
         self.settings.detection_settings.relax_gate_enabled = bool(status)
@@ -129,6 +135,7 @@ class SettingsHandler:
 
     def _update_relax_window_ms(self, window_ms):
         self.settings.detection_settings.relax_window_ms = int(window_ms)
+        self._graph.update_relax_mean_line()
 
     def _update_relax_gate_window_ms(self, window_ms):
         self.settings.detection_settings.relax_gate_window_ms = int(window_ms)
@@ -339,6 +346,7 @@ class SettingsHandler:
             (self._peak_panel.spin_box_threshold_curr, s.threshold),
             (self._peak_panel.spin_box_bit, s.bit),
             (self._peak_panel.check_box_relax, s.relax),
+            (self._peak_panel.check_box_show_relax_mean, s.show_relax_mean),
             (self._peak_panel.check_box_relax_gate, s.relax_gate_enabled),
             (self._peak_panel.spin_box_relax_window_ms, s.relax_window_ms),
             (self._peak_panel.spin_box_relax_gate_window_ms, s.relax_gate_window_ms),
@@ -390,6 +398,7 @@ class SettingsHandler:
         self.data_processor.create_butter()
         self.data_processor.create_notch()
         self._graph.update_yrange()
+        self._graph.update_relax_mean_line()
         self._setup_units()
         self._update_thr()
         self._refresh_player_sequence()

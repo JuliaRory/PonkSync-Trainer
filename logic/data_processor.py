@@ -163,7 +163,11 @@ class DataProcessor(QObject):
         s = self.settings.detection_settings
         if s.thr_adaptive:
             baseline = x[:self._ms_to_sample(s.baseline_ms)]
-            threshold = np.mean(baseline) + s.n_sd * np.std(baseline)
+            finite_baseline = baseline[np.isfinite(baseline)]
+            if finite_baseline.size:
+                threshold = np.mean(finite_baseline) + s.n_sd * np.std(finite_baseline)
+            else:
+                threshold = s.threshold * (10 ** self.settings.plot_settings.scale_factor)
         else:
             threshold = s.threshold * (10 ** self.settings.plot_settings.scale_factor)
         return threshold
@@ -172,34 +176,34 @@ class DataProcessor(QObject):
         window_ms = max(1, int(self.settings.detection_settings.relax_window_ms))
         return max(1, int(round(window_ms * self.settings.Fs / 1000)))
 
-    def _find_relax_threshold_crossings(self, x, threshold):
+    def _relax_window_mean(self, x):
         window_samples = self._relax_window_samples()
+        x = np.asarray(x, dtype=float)
+        mean_signal = np.full(len(x), np.nan, dtype=float)
         if len(x) < window_samples:
-            return np.array([], dtype=int), np.array([], dtype=int)
+            return mean_signal
 
         kernel = np.ones(window_samples) / window_samples
         window_means = np.convolve(x, kernel, mode="valid")
-        window_active = window_means < threshold
-        crossing_window_starts = np.where(
-            window_active & np.concatenate(([True], ~window_active[:-1]))
+        mean_signal[window_samples - 1:] = window_means
+        return mean_signal
+
+    def _find_relax_threshold_crossings(self, mean_signal, threshold):
+        mean_active = mean_signal < threshold
+        active_idxs = np.where(mean_active)[0]
+        if len(active_idxs) == 0:
+            return active_idxs, np.array([], dtype=int)
+
+        crossing_idxs = np.where(
+            mean_active & np.concatenate(([True], ~mean_active[:-1]))
         )[0]
-        crossing_idxs = crossing_window_starts + window_samples - 1
-
-        active_window_starts = np.where(window_active)[0]
-        if len(active_window_starts) == 0:
-            return np.array([], dtype=int), crossing_idxs
-
-        active_diff = np.zeros(len(x) + 1, dtype=int)
-        np.add.at(active_diff, active_window_starts, 1)
-        np.add.at(active_diff, active_window_starts + window_samples, -1)
-        active_idxs = np.where(np.cumsum(active_diff[:-1]) > 0)[0]
         return active_idxs, crossing_idxs
 
-    def _find_threshold_crossings(self, x, threshold):
+    def _find_threshold_crossings(self, signal_for_decision, threshold):
         if self.settings.detection_settings.relax:
-            return self._find_relax_threshold_crossings(x, threshold)
+            return self._find_relax_threshold_crossings(signal_for_decision, threshold)
 
-        active_idxs = np.where(x > threshold)[0]
+        active_idxs = np.where(signal_for_decision > threshold)[0]
         return active_idxs, active_idxs
 
     def request_relax_gate(self):
@@ -263,11 +267,12 @@ class DataProcessor(QObject):
 
             mask = np.where((self.ts >= self._trigger+window[0]) & (self.ts <= self._trigger+window[1]))[0]
             x = np.array(self.emg)[mask]    # выделяем нужный кусок
+            signal_for_decision = self._relax_window_mean(x) if s.relax else x
 
-            threshold = self._define_thr(x)
+            threshold = self._define_thr(signal_for_decision)
             # self.logger.info(f"Threshold is {threshold}.")
 
-            active_idxs, crossings = self._find_threshold_crossings(x, threshold)
+            active_idxs, crossings = self._find_threshold_crossings(signal_for_decision, threshold)
             
             delay = np.nan
             if len(crossings) > 0:
@@ -281,7 +286,7 @@ class DataProcessor(QObject):
                 delay = onset_time - self._trigger
                 duration = len(active_idxs)
 
-                amp = np.min(x[active_idxs]) if s.relax else np.max(x[active_idxs])
+                amp = np.min(signal_for_decision[active_idxs]) if s.relax else np.max(signal_for_decision[active_idxs])
 
                 self.delayValue.emit(int(delay))        # --> to show immediate feedback
 

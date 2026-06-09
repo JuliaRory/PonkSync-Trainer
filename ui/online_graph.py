@@ -1,4 +1,5 @@
 import pyqtgraph as pg
+import numpy as np
 from PyQt5.QtWidgets import QFrame, QHBoxLayout
 
 class OnlineGraph(QFrame):
@@ -7,6 +8,7 @@ class OnlineGraph(QFrame):
         super().__init__(parent)
 
         self.data_processor = data_processor
+        self.app_settings = settings
         self.settings = settings.plot_settings
 
         self._setup_ui()
@@ -23,6 +25,11 @@ class OnlineGraph(QFrame):
 
         self.figure = pg.PlotWidget(self)     # list с виджетами для графиков миограмм
         self.line = self.figure.plot(y=self.data_processor.emg, x=self.data_processor.ts)    # отображение "ничего" на месте сигнала миограммы
+        self.relax_mean_line = self.figure.plot(
+            x=[],
+            y=[],
+            pen=pg.mkPen(color=(0, 190, 255), width=2),
+        )
 
         # self._trigger_line = self.figure.plot(y=self.data_processor.emg, x=self.data_processor.ts, pen="b")    # отображение "ничего" на месте сигнала миограммы
         
@@ -51,10 +58,29 @@ class OnlineGraph(QFrame):
 
     def update_plot(self):
         self.line.setData(x=self.data_processor.ts, y=self.data_processor.emg)
+        self.update_relax_mean_line()
 
         # self._trigger_line.setData(x=self.data_processor.ts, y=self.data_processor.trigger)
 
         self.check_trigger_lines()
+
+    def update_relax_mean_line(self):
+        detection_settings = self.app_settings.detection_settings
+        if not detection_settings.relax or not detection_settings.show_relax_mean:
+            self.relax_mean_line.setData(x=[], y=[])
+            return
+
+        y = np.asarray(self.data_processor.emg, dtype=float)
+        if y.size == 0:
+            self.relax_mean_line.setData(x=[], y=[])
+            return
+
+        mean_y = self.data_processor._relax_window_mean(y)
+        if not np.any(np.isfinite(mean_y)):
+            self.relax_mean_line.setData(x=[], y=[])
+            return
+
+        self.relax_mean_line.setData(x=self.data_processor.ts, y=mean_y)
     
     def check_trigger_lines(self):
         # view_range = self.figure.viewRange()
