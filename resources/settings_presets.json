@@ -93,5 +93,14 @@
     "isi_max_s": 3.0,
     "saved_stimuli_curr": "bar_20-10_SST",
     "record": true
+  },
+  "phases_training": {
+    "stimuli_curr": 0, 
+    "feedback_mode_curr": 0,
+    "sequence_mode": true,
+    "isi_min_s": 1.0,
+    "isi_max_s": 2.0,
+    "saved_stimuli_curr": "bar_phases_rest_vs_motor_1",
+    "record": true
   }
 }
